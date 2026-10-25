@@ -1,0 +1,2000 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="color-scheme" content="only light">
+<meta name="theme-color" content="#1e3a8a">
+<title>AI 侦探社 · 查证卡</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%231e3a8a'/%3E%3Ccircle cx='10.5' cy='10.5' r='5.2' fill='none' stroke='white' stroke-width='2'/%3E%3Cpath d='M14.5 14.5 20 20' stroke='white' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E">
+<style>
+  :root {
+    /* 侦探档案风：米色纸面 + 风衣蓝 + 印章色 */
+    --bg: #f3efe6;
+    --card: #fffdf8;
+    --ink: #1c1917;
+    --muted: #78716c;
+    --line: #e0d9c8;
+    --accent: #1e3a8a;        /* 侦探风衣蓝 */
+    --accent-deep: #172e6e;
+    --accent-soft: #eef2ff;
+    --true: #15803d;  --true-bg: #ecfdf3;  --true-line: #bbf7d0;
+    --false: #b91c1c; --false-bg: #fef2f2; --false-line: #fecaca;
+    --unsure: #b45309; --unsure-bg: #fffbeb; --unsure-line: #fde68a;
+    --unknown: #52525b; --unknown-bg: #f4f4f5; --unknown-line: #d4d4d8;
+    --gold: #a16207;          /* 结案印章 */
+    --paper-line: #eae3d3;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+      "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+  .wrap { max-width: 760px; margin: 0 auto; padding: 28px 16px 60px; }
+
+  /* 顶栏：侦探社招牌 */
+  .topbar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 2px; margin-bottom: 26px;
+  }
+  .brand { display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 15px; letter-spacing: .3px; }
+  .brand .logo {
+    width: 26px; height: 26px; border-radius: 7px; background: var(--accent); color: #fff;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .brand .en { display: none; }
+  .pill {
+    font-size: 11px; color: var(--muted); background: #fff; border: 1px solid var(--line);
+    border-radius: 999px; padding: 2px 9px; white-space: nowrap;
+  }
+  .pill.real { color: #15803d; border-color: var(--true-line); background: #f6fdf8; }
+  .pill.real::before {
+    content: ""; display: inline-block; width: 5px; height: 5px; border-radius: 50%;
+    background: #22c55e; margin-right: 5px; vertical-align: 1px;
+  }
+  .pill.mock { color: #b45309; border-color: var(--unsure-line); background: var(--unsure-bg); }
+  .pill.warn { color: #b91c1c; border-color: var(--false-line); background: var(--false-bg); }
+
+  /* 首页只留标题、一个搜索框、几个例子，像搜索引擎一样克制 */
+  .hero { text-align: center; margin: 6px 0 20px; }
+  .hero h1 { font-size: clamp(26px, 5vw, 36px); line-height: 1.3; letter-spacing: 0; font-weight: 800; }
+  .hero .sub { color: var(--muted); margin-top: 8px; font-size: 13.5px; }
+  .hero .track-tag, .hero .flow, .hero .rule { display: none; }
+  .scope-note { margin: 12px 0 0; font-size: 11.5px; color: #a8a29e; line-height: 1.6; }
+
+  /* 模式切换：压成一个小分段控件 */
+  .modes { display: inline-flex; gap: 2px; padding: 2px; background: #efeade; border-radius: 9px; }
+  .mode-btn {
+    display: block; text-align: center; padding: 4px 10px; border: none;
+    border-radius: 7px; background: transparent; cursor: pointer;
+  }
+  .mode-btn:hover { color: var(--accent); }
+  .mode-btn.active { background: #fff; box-shadow: 0 1px 3px rgba(28,25,23,.10); }
+  .mode-name { font-size: 12px; font-weight: 600; color: var(--muted); }
+  .mode-btn.active .mode-name { color: var(--ink); }
+  .mode-sub { display: none; }
+
+  /* 两种模式怎么选：一行说明 + 可展开对比 */
+  .mode-note { margin-top: 7px; display: flex; align-items: baseline; gap: 4px 8px; flex-wrap: wrap; }
+  .mode-note .txt { font-size: 11.5px; color: #a8a29e; line-height: 1.6; }
+  .mode-note .more {
+    border: none; background: none; padding: 0; cursor: pointer; font-size: 11.5px;
+    color: var(--accent); text-decoration: underline; text-underline-offset: 3px;
+  }
+  .mode-help { display: none; margin-top: 10px; border: 1px solid var(--line); border-radius: 10px; background: #fff; overflow: hidden; }
+  .mode-help.show { display: block; }
+  .mh-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--line); }
+  .mh-card { background: #fff; padding: 12px 14px; }
+  .mh-card .mh-t { font-size: 12.5px; font-weight: 700; color: var(--ink); }
+  .mh-card .mh-t span { font-weight: 500; color: var(--muted); margin-left: 6px; font-size: 11.5px; }
+  .mh-card ul { margin: 7px 0 0; padding-left: 16px; }
+  .mh-card li { font-size: 12px; color: #57534e; line-height: 1.65; margin: 2px 0; }
+  .mode-help .pick { margin: 0; padding: 9px 14px; font-size: 12px; color: #57534e; background: #faf8f3; border-top: 1px solid var(--line); }
+  .mode-help .pick b { color: var(--ink); }
+
+  /* 置信度徽章 */
+  .conf {
+    font-size: 12px; padding: 2px 10px; border-radius: 999px;
+    background: var(--color-background-info, #eef2ff); color: var(--color-text-info, #3730a3);
+  }
+  .conf-high { background: #e7f6ec; color: #1b6b3a; }
+  .conf-mid  { background: #fdf1e3; color: #8a5a12; }
+  .conf-low  { background: #fdecec; color: #9b2c2c; }
+
+  /* 证据链 */
+  .chain { margin-top: 20px; }
+  .chain h3, .rounds h3 { font-size: 14px; font-weight: 500; margin: 0 0 10px; }
+  .domains h3 { font-size: 14px; font-weight: 500; margin: 0 0 10px; }
+  .domains { margin-top: 20px; }
+  .domain-card {
+    background: var(--card); border: 1px solid var(--line);
+    border-radius: 10px; padding: 12px 14px; margin-bottom: 10px;
+  }
+  .domain-title { font-weight: 600; font-size: 14px; margin-bottom: 8px; color: var(--ink); }
+  .domain-line { font-size: 12.5px; line-height: 1.75; color: var(--muted); }
+  .domain-line b { color: var(--ink); font-weight: 600; margin-right: 6px; }
+  .round-backfill { border-color: #c9a227; background: var(--unsure-bg); }
+  .round-backfill .round-no { background: #c9a227; color: #fff; }
+  .chain-step {
+    display: flex; gap: 10px; padding: 8px 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .chain-step:last-child { border-bottom: none; }
+  .chain-no {
+    flex: none; width: 22px; height: 22px; border-radius: 50%;
+    background: var(--accent-soft); color: var(--accent);
+    font-size: 12px; display: flex; align-items: center; justify-content: center;
+  }
+  .chain-name { flex: none; font-size: 13px; font-weight: 500; min-width: 92px; }
+  .chain-detail { font-size: 13px; color: var(--muted); line-height: 1.6; }
+
+  /* 各轮检索 */
+  .rounds { margin-top: 20px; }
+  .round {
+    border: 1px solid var(--line); border-radius: 10px;
+    padding: 10px 12px; margin-bottom: 10px;
+  }
+  .round-head { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 6px; }
+  .round-no {
+    font-size: 12px; padding: 1px 8px; border-radius: 999px;
+    background: var(--accent-soft); color: var(--accent);
+  }
+  .round-q { font-size: 13px; font-weight: 500; }
+  .round-hits { font-size: 12px; color: var(--muted); }
+  .round-reason { font-size: 12px; color: var(--muted); line-height: 1.6; }
+
+  /* 信源层级标签 */
+  .tier-tag {
+    flex: none; font-size: 11px; padding: 1px 7px; border-radius: 4px; margin-left: 6px;
+  }
+  .tier-primary   { background: #e7f6ec; color: #1b6b3a; }
+  .tier-secondary { background: #e8f0fe; color: #1d4ed8; }
+  .tier-tertiary  { background: #fdf1e3; color: #8a5a12; }
+  .tier-unknown   { background: #f1f1f1; color: #555; }
+  .tier-farm      { background: #fdecec; color: #9b2c2c; }
+  .src { display: flex; gap: 8px; align-items: flex-start; padding: 5px 0; }
+
+  /* 输入区就是一个搜索框，不再套一层档案卡 */
+  .panel {
+    background: transparent; border: none; border-radius: 0;
+    padding: 0; box-shadow: none; overflow: visible;
+  }
+  .panel-head {
+    margin: 0 -18px 14px; padding: 10px 18px; background: #f8f5ec;
+    border-bottom: 1px dashed var(--line);
+    display: flex; justify-content: space-between; align-items: center; gap: 10px;
+  }
+  .panel-head .t { font-size: 12px; font-weight: 700; letter-spacing: 2px; color: var(--accent); }
+  .case-no { font-size: 11.5px; color: var(--muted); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+  /* 真假李逵对照台 */
+  .kui-gui {
+    display: grid; grid-template-columns: 1fr auto 1fr; gap: 10px;
+    align-items: stretch; margin: 12px 0 6px;
+  }
+  .kg-side {
+    border: 2px solid var(--line); border-radius: 12px; padding: 10px 8px 12px;
+    text-align: center; background: #faf8f2; opacity: .5;
+    filter: grayscale(.7); transition: opacity .25s, filter .25s, border-color .25s, background .25s;
+  }
+  .kg-side.lit { opacity: 1; filter: none; }
+  .kg-true.lit { border-color: var(--true); background: var(--true-bg); }
+  .kg-false.lit { border-color: var(--false); background: var(--false-bg); }
+  .kg-who { font-size: 15px; font-weight: 900; letter-spacing: 3px; }
+  .kg-side .face { font-size: 30px; line-height: 1.3; margin: 2px 0; }
+  .kg-role { font-size: 11px; color: var(--muted); letter-spacing: 1px; }
+  .kg-side.lit .kg-role { color: var(--ink); }
+  .kg-vs { align-self: center; font-weight: 900; color: var(--muted); font-size: 12px; letter-spacing: 1px; }
+  /* 结案印章 */
+  .stamp {
+    display: none; font-size: 13px; font-weight: 900; letter-spacing: 5px;
+    border: 3px double var(--gold); color: var(--gold); border-radius: 8px;
+    padding: 5px 13px 5px 18px; transform: rotate(-10deg);
+  }
+  .stamp.show { display: inline-block; }
+  .stamp-true { color: var(--true); border-color: var(--true); }
+  .stamp-false { color: var(--false); border-color: var(--false); }
+  .inputrow {
+    display: flex; gap: 6px; align-items: stretch; background: #fff;
+    border: 1px solid var(--line); border-radius: 14px; padding: 5px;
+    box-shadow: 0 2px 12px rgba(28,25,23,.06);
+    transition: border-color .15s, box-shadow .15s;
+  }
+  .inputrow:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  #query {
+    flex: 1; border: none; border-radius: 10px; padding: 10px; min-height: 54px;
+    font-size: 15.5px; font-family: inherit; resize: none; background: transparent; line-height: 1.5;
+  }
+  #query:focus { outline: none; }
+  #btn {
+    border: none; border-radius: 10px; background: var(--accent); color: #fff;
+    font-size: 15px; font-weight: 600; padding: 0 20px; cursor: pointer; white-space: nowrap;
+    min-width: 84px;
+  }
+  #btn:hover { background: #1b3a9e; }
+  #btn:disabled { background: #93a4c8; cursor: not-allowed; }
+  #mic, #shot {
+    border: none; border-radius: 8px; background: transparent; color: var(--muted);
+    padding: 0; width: 34px; height: 34px; cursor: pointer; line-height: 1;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  #mic svg, #shot svg { width: 20px; height: 20px; }
+  #mic:hover, #shot:hover { background: #efeade; color: var(--accent); }
+  #shot.busy { opacity: .5; cursor: progress; }
+  #mic.recording { border-color: #d92d20; background: #fdecec; animation: mic-pulse 1.2s ease-in-out infinite; }
+  #mic.unsupported { opacity: .45; cursor: not-allowed; }
+  @keyframes mic-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(217,45,32,.35); }
+    50% { box-shadow: 0 0 0 6px rgba(217,45,32,0); }
+  }
+  /* 截图查证：预览 + 识别结果 */
+  .shot-box {
+    display: none; margin-top: 10px; gap: 12px; align-items: flex-start;
+    border: 1px dashed var(--line); border-radius: 10px; padding: 10px; background: #fbfaf6;
+  }
+  .shot-box.show { display: flex; }
+  .shot-thumb {
+    width: 120px; max-height: 120px; object-fit: cover; border-radius: 6px;
+    border: 1px solid var(--line); background: #fff; flex: 0 0 auto;
+  }
+  .shot-info { flex: 1; min-width: 0; font-size: 12.5px; line-height: 1.65; }
+  .shot-status { color: var(--muted); }
+  .shot-status.ok { color: var(--true); font-weight: 600; }
+  .shot-status.err { color: var(--false); }
+  .shot-detail { margin-top: 6px; }
+  .shot-detail summary { cursor: pointer; color: var(--accent); font-size: 12px; }
+  .shot-ocr {
+    margin: 6px 0 0; padding: 8px 10px; background: #fff; border: 1px solid var(--line);
+    border-radius: 6px; font-size: 12px; color: #444; white-space: pre-wrap; word-break: break-all;
+    max-height: 130px; overflow: auto; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  .voice-tip {
+    display: none; margin-top: 8px; font-size: 12.5px; color: var(--muted);
+  }
+  .voice-tip.show { display: block; }
+  .voice-tip.error { color: var(--false); }
+
+  .toolrow { display: flex; align-items: center; gap: 4px; margin-top: 9px; }
+  .toolrow .modes { margin-left: auto; }
+
+  .presets { margin-top: 12px; display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; justify-content: center; }
+  .presets .label { font-size: 12px; color: #a8a29e; }
+  .chip {
+    font-size: 12.5px; border: none; background: transparent; border-radius: 0;
+    padding: 2px 0; cursor: pointer; color: #57534e;
+    text-decoration: underline; text-underline-offset: 3px; text-decoration-color: #d6cfc0;
+  }
+  .chip:hover { color: var(--accent); text-decoration-color: var(--accent); background: transparent; }
+  .scope-line { margin-top: 10px; font-size: 11px; color: #a8a29e; text-align: center; line-height: 1.6; }
+
+  /* 加载态 */
+  #loading { display: none; margin-top: 18px; }
+  #loading .bar {
+    height: 6px; border-radius: 3px; background: var(--accent-soft); overflow: hidden; position: relative;
+  }
+  #loading .bar::after {
+    content: ""; position: absolute; left: -40%; top: 0; height: 100%; width: 40%;
+    background: var(--accent); border-radius: 3px; animation: slide 1.2s ease-in-out infinite;
+  }
+  @keyframes slide { to { left: 100%; } }
+  #loading .msg { margin-top: 10px; font-size: 13.5px; color: var(--muted); }
+
+  /* 错误 */
+  #error {
+    display: none; margin-top: 18px; background: var(--false-bg); border: 1px solid var(--false-line);
+    color: var(--false); border-radius: 12px; padding: 14px 16px; font-size: 14px;
+  }
+
+  /* 查证卡 = 结案报告 */
+  #result { display: none; margin-top: 20px; }
+  .card {
+    background: var(--card); border: 1px solid var(--line); border-radius: 14px; overflow: hidden;
+    box-shadow: 0 4px 16px rgba(28,25,23,.08);
+  }
+  .card .head {
+    padding: 16px 20px 12px; border-bottom: 1px dashed var(--line);
+    background: linear-gradient(180deg, #fbf9f3 0%, var(--card) 100%);
+    display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px;
+  }
+  .card .head .case-file {
+    font-size: 11px; font-weight: 700; letter-spacing: 2px; color: #fff;
+    background: var(--accent); border-radius: 5px; padding: 2px 8px;
+  }
+  .card .q { font-size: 13.5px; color: var(--muted); flex: 1 1 100%; margin-bottom: 2px; }
+  .card .q b { color: var(--ink); font-weight: 700; }
+  .head .stamp { margin-left: auto; }
+  .verdict {
+    display: inline-flex; align-items: center; gap: 8px; font-size: 16px; font-weight: 800;
+    padding: 5px 14px; border-radius: 10px; border: 1.5px solid;
+  }
+  .verdict .icon { font-size: 22px; }
+  .v-true { color: var(--true); background: var(--true-bg); border-color: var(--true-line); }
+  .v-false { color: var(--false); background: var(--false-bg); border-color: var(--false-line); }
+  .v-unsure { color: var(--unsure); background: var(--unsure-bg); border-color: var(--unsure-line); }
+  .v-unknown { color: var(--unknown); background: var(--unknown-bg); border-color: var(--unknown-line); }
+  .mockbadge {
+    margin-left: 10px; font-size: 11.5px; color: var(--unsure); background: var(--unsure-bg);
+    border: 1px solid var(--unsure-line); border-radius: 6px; padding: 2px 8px; vertical-align: middle;
+  }
+  .card .body { padding: 16px 20px 18px; }
+  .reason { font-size: 15px; font-weight: 600; margin-bottom: 10px; }
+  .detail { font-size: 14.5px; color: #374151; white-space: pre-wrap; }
+  .cite {
+    color: var(--accent); text-decoration: none; font-size: 12px; padding: 0 1px;
+  }
+  .cite:hover { text-decoration: underline; }
+  .sources { margin-top: 16px; border-top: 1px dashed var(--line); padding-top: 12px; }
+  .sources h3 { font-size: 13px; color: var(--muted); font-weight: 600; margin-bottom: 8px; }
+  .src { display: flex; gap: 8px; font-size: 13px; padding: 5px 0; align-items: flex-start; }
+  .src .no {
+    flex: none; width: 20px; height: 20px; border-radius: 6px; background: var(--accent-soft);
+    color: var(--accent); font-size: 11.5px; font-weight: 700; display: flex;
+    align-items: center; justify-content: center; position: relative; top: 2px;
+  }
+  .src a { flex: 1; min-width: 0; color: var(--accent); text-decoration: none; line-height: 1.5;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .src a:hover { text-decoration: underline; }
+  .src .meta { flex: none; color: var(--muted); font-size: 11.5px; white-space: nowrap; }
+  .meta-line {
+    margin-top: 14px; font-size: 12px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 14px;
+  }
+  .rawbox { margin-top: 12px; }
+  .rawbox summary { font-size: 12.5px; color: var(--muted); cursor: pointer; }
+  .rawbox pre {
+    margin-top: 8px; background: #f8fafc; border: 1px solid var(--line); border-radius: 8px;
+    padding: 10px 12px; font-size: 12.5px; white-space: pre-wrap; word-break: break-all; color: #475569;
+  }
+
+  /* 历史记录 */
+  #case-log { margin-top: 22px; }
+  #case-log summary, #watch-log summary { font-size: 12px; color: var(--muted); cursor: pointer; padding: 3px 0; }
+  #case-log[open] summary, #watch-log[open] summary { margin-bottom: 8px; }
+  .hist-item {
+    background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+    padding: 9px 14px; font-size: 13.5px; margin-bottom: 8px; cursor: pointer;
+    display: flex; justify-content: space-between; align-items: center; gap: 10px;
+  }
+  .hist-item:hover { border-color: var(--accent); }
+  .hist-item .q { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .hist-item .v { flex: none; font-size: 12px; font-weight: 700; }
+
+  /* 持续盯梢：记住一批说法，随时复检，结论变了就标红 */
+  #watch-log { margin-top: 22px; }
+  #watch-log[open] { margin-top: 22px; }
+  .watch-item {
+    background: var(--card); border: 1px solid var(--line); border-left: 3px solid var(--line);
+    border-radius: 10px; padding: 10px 14px; margin-bottom: 8px; font-size: 13.5px;
+  }
+  .watch-item.changed { border-left-color: var(--false); background: #fff9f9; }
+  .watch-item.due { border-left-color: var(--unsure); }
+  .watch-top { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+  .watch-q { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+  .watch-bot { margin-top: 6px; font-size: 12px; color: var(--muted); display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .watch-badge { font-size: 11.5px; font-weight: 700; padding: 1px 8px; border-radius: 999px; border: 1px solid; }
+  .watch-badge.v-true { color: var(--true); border-color: var(--true-line); background: var(--true-bg); }
+  .watch-badge.v-false { color: var(--false); border-color: var(--false-line); background: var(--false-bg); }
+  .watch-badge.v-unsure { color: var(--unsure); border-color: var(--unsure-line); background: var(--unsure-bg); }
+  .watch-badge.v-unknown { color: var(--unknown); border-color: var(--unknown-line); background: var(--unknown-bg); }
+  .watch-actions { flex: none; display: flex; gap: 6px; }
+  .watch-actions button {
+    font-size: 12px; padding: 3px 10px; border-radius: 7px; cursor: pointer;
+    border: 1px solid var(--line); background: #fff; color: #444;
+  }
+  .watch-actions button:hover { border-color: var(--accent); color: var(--accent); }
+  .watch-actions button:disabled { opacity: .5; cursor: progress; }
+  .watch-changed-note { margin-top: 5px; font-size: 12.5px; color: var(--false); font-weight: 600; }
+  .watch-btn {
+    margin-top: 10px; font-size: 12px; padding: 4px 12px; border-radius: 999px;
+    border: 1px solid var(--line); background: #fff; color: var(--muted);
+    cursor: pointer; font-weight: 500;
+  }
+  .watch-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .watch-btn.done { border-style: solid; color: var(--muted); border-color: var(--line); background: #f8f8f8; cursor: default; }
+
+  footer {
+    margin-top: 44px; text-align: center; font-size: 12px; color: #a8a29e;
+    border-top: 1px dashed var(--line); padding-top: 18px;
+  }
+  footer .brandline { color: var(--accent); font-weight: 700; letter-spacing: 1px; }
+  footer .line { margin-top: 4px; }
+
+  /* ===== v2.9：极简首页（类搜索引擎）===== */
+  body { -webkit-text-size-adjust: 100%; }
+  .wrap { max-width: 620px; padding: 22px 16px 48px; }
+
+  .topbar { padding: 0 2px; margin-bottom: 22px; }
+  .brand { font-size: 15px; gap: 8px; min-width: 0; }
+  .brand .logo { width: 26px; height: 26px; border-radius: 7px; }
+  .pill { font-size: 11px; padding: 2px 9px; max-width: 46%; overflow: hidden;
+    text-overflow: ellipsis; white-space: nowrap; }
+
+  .hero { text-align: center; margin: 2px 0 18px; }
+  .hero h1 { font-size: clamp(25px, 5.2vw, 34px); }
+  .hero .sub { font-size: 13px; margin-top: 7px; }
+
+  .panel { padding: 0; border-radius: 0; box-shadow: none; }
+
+  .inputrow { flex-wrap: nowrap; gap: 5px; padding: 5px; }
+  #query { flex: 1 1 auto; min-height: 52px; padding: 10px; font-size: 15.5px; border-radius: 10px; }
+  #btn { flex: 0 0 auto; min-width: 82px; height: auto; padding: 0 18px; margin-left: 0;
+    border-radius: 10px; font-size: 14.5px; align-self: stretch; }
+
+  .presets { margin-top: 11px; gap: 4px 10px; }
+  .presets .label { font-size: 11.5px; }
+  .chip { font-size: 12px; padding: 2px 0; background: transparent; flex: 0 0 auto; white-space: nowrap; }
+
+  .scope-line { margin-top: 9px; font-size: 10.5px; color: #a8a29e; text-align: center; }
+  .scope { display: none; }
+
+  /* 出结果后收起首页大标题与示例，让结果直接顶上来（类似搜索引擎结果页）；
+     截图、语音、快速/深度切换始终保留，方便接着查或换模式。 */
+  body.has-result .hero { display: none; }
+  body.has-result .presets, body.has-result .scope-line { display: none; }
+  body.has-result .mode-note, body.has-result .mode-help { display: none; }
+  body.has-result #query { height: 44px; min-height: 44px; }
+  body.has-result .topbar { margin-bottom: 14px; }
+  body.has-result #result, body.has-result #report { margin-top: 12px; }
+
+  #loading { margin-top: 16px; padding: 12px 14px; background: var(--card);
+    border: 1px solid var(--line); border-radius: 14px; }
+  #loading .bar { height: 4px; }
+  .live-claim { font-size: 14px; font-weight: 600; margin-bottom: 8px; word-break: break-word; }
+  #loading .msg { margin-top: 8px; font-size: 12.5px; }
+  .live-src { margin-top: 8px; }
+  .live-src summary { font-size: 12px; color: var(--muted); cursor: pointer; }
+  .live-src .list { margin-top: 4px; max-height: 168px; overflow: auto; }
+  .live-src a { display: block; font-size: 12px; color: var(--muted); text-decoration: none;
+    padding: 2px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .live-src a:hover { color: var(--accent); }
+
+  #error { margin-top: 14px; border-radius: 12px; padding: 12px 14px; font-size: 13.5px; }
+
+  #result, #report { margin-top: 16px; }
+  .card { border-radius: 16px; box-shadow: 0 4px 18px rgba(28,25,23,.07); }
+  .card .head { padding: 14px 16px 10px; border-bottom: none; display: block;
+    background: linear-gradient(180deg, #fbf9f3 0%, var(--card) 100%); }
+  .card .head .case-file { float: right; font-size: 10px; letter-spacing: 1.4px;
+    background: #f1ece0; color: var(--muted); padding: 3px 8px; }
+  .card .body { padding: 4px 16px 16px; }
+  .verdict { font-size: 19px; padding: 7px 15px; border-radius: 11px; margin-top: 8px; }
+  .verdict .icon { font-size: 20px; }
+  .mockbadge { font-size: 10.5px; }
+  .card .q { font-size: 13px; margin: 8px 0 10px; line-height: 1.55; }
+  .card .q b { color: var(--ink); font-size: 14.5px; font-weight: 700; }
+  .reason { font-size: 15px; line-height: 1.65; margin-bottom: 8px; }
+  .detail { font-size: 14px; line-height: 1.8; color: #3f3a36; }
+  .detail-text.clamp { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  .detail-fold { display: inline-block; margin-top: 3px; font-size: 11px; color: var(--accent); cursor: pointer; }
+
+  .status-banner { display: none; margin: 0 0 10px; padding: 9px 12px; border-radius: 10px;
+    background: var(--unsure-bg); border: 1px solid var(--unsure-line);
+    color: #92400e; font-size: 12.5px; line-height: 1.55; }
+  .status-banner.show { display: block; }
+
+  .evidence-explanation { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); }
+  .ev-top { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+  .ev-title { font-size: 13px; font-weight: 800; letter-spacing: .5px; }
+  .ev-strength { font-size: 11.5px; color: var(--muted); }
+  .ev-intro { margin-top: 4px; font-size: 11.5px; color: var(--muted); }
+  .ev-quote { margin-top: 8px; padding: 10px 12px; border: 1px solid var(--line);
+    border-radius: 12px; background: #fcfbf7; }
+  .ev-quote p { font-size: 13.5px; line-height: 1.7; color: #3f3a36; word-break: break-word; }
+  .ev-quote p.clamp { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  .ev-fold { display: inline-block; margin-top: 3px; font-size: 11px; color: var(--accent); cursor: pointer; }
+  .ev-meta { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 6px;
+    font-size: 11.5px; color: var(--muted); }
+  .ev-tag { font-size: 10.5px; font-weight: 700; padding: 1px 7px; border-radius: 5px; }
+  .ev-tag.support { color: #166534; background: #e7f6ec; }
+  .ev-tag.oppose { color: #9b2c2c; background: #fdecec; }
+  .ev-tag.neutral { color: #475569; background: #eef2f7; }
+  .ev-quote a { color: var(--accent); text-decoration: none; }
+  .ev-quote a:hover { text-decoration: underline; }
+  .ev-more { margin-top: 8px; }
+  .ev-more summary { font-size: 11.5px; color: var(--muted); cursor: pointer; }
+  .ev-more .ev-quote { opacity: .75; }
+  .ev-basis { margin-top: 10px; font-size: 12px; color: var(--muted); line-height: 1.7; }
+  .ev-basis p { margin-top: 2px; }
+  .ev-why { margin-top: 10px; font-size: 13px; color: var(--unsure); line-height: 1.65; }
+  .evidence-explanation h4 { margin: 14px 0 4px; font-size: 12.5px; color: var(--ink); }
+  .evidence-explanation ol { margin: 0 0 0 18px; font-size: 12.5px; color: #4b5563; line-height: 1.75; }
+  .evidence-explanation small { display: block; margin-top: 10px; font-size: 10.5px;
+    color: #a8a29e; line-height: 1.55; }
+
+  .sources { margin-top: 14px; padding-top: 12px; }
+  .sources h3 { font-size: 12px; margin-bottom: 4px; }
+  .src { padding: 4px 0; font-size: 12.5px; gap: 7px; }
+  .src .no { width: 18px; height: 18px; border-radius: 5px; font-size: 10.5px; }
+  .src .meta { color: var(--muted); font-size: 11px; }
+  .src-more { margin-top: 6px; }
+  .src-more summary { font-size: 11.5px; color: var(--muted); cursor: pointer; }
+
+  .meta-line { margin-top: 12px; font-size: 10.5px; color: #a8a29e; gap: 8px; }
+  .actions { margin-top: 12px; }
+  .watch-btn { margin-top: 0; font-size: 12px; padding: 6px 12px; border-radius: 8px; }
+  .trace { margin-top: 12px; border-top: 1px dashed var(--line); padding-top: 10px; }
+  .trace > summary { font-size: 12px; color: var(--muted); cursor: pointer; }
+  .trace .domains, .trace .chain, .trace .rounds { margin-top: 12px; }
+  .trace h3 { font-size: 12px; margin-bottom: 6px; }
+  .domain-card, .round { padding: 9px 11px; border-radius: 9px; }
+  .chain-step { padding: 6px 0; }
+  .chain-name { min-width: 74px; font-size: 12px; }
+  .chain-detail, .domain-line, .round-reason { font-size: 11.5px; }
+
+  .rawbox { margin-top: 10px; }
+  .rawbox summary { font-size: 11px; }
+  footer { margin-top: 30px; font-size: 11px; padding-top: 14px; line-height: 1.7; }
+  footer .line { margin-top: 2px; }
+
+  @media (max-width: 640px) {
+    .wrap { padding: 14px 12px 36px; }
+    .topbar { padding: 0 2px; margin-bottom: 16px; }
+    .brand { font-size: 14px; gap: 7px; }
+    .brand .logo { width: 24px; height: 24px; }
+    .pill { font-size: 10.5px; max-width: 50%; }
+    .hero { margin: 0 0 14px; }
+    .hero h1 { font-size: 24px; }
+    .hero .sub { font-size: 12.5px; }
+    .panel { padding: 0; }
+    .mode-btn { padding: 3px 8px; }
+    .mode-name { font-size: 11.5px; }
+    .mode-note .txt, .mode-note .more { font-size: 11px; }
+    .mh-grid { grid-template-columns: 1fr; }
+    .mh-card { padding: 10px 12px; }
+    .inputrow { gap: 4px; padding: 4px; border-radius: 13px; }
+    #query { min-height: 50px; padding: 9px; font-size: 16px; }
+    #shot, #mic { flex: 0 0 32px; width: 32px; height: 32px; }
+    #btn { flex: 0 0 auto; height: auto; min-width: 74px; padding: 0 13px; font-size: 14px; }
+    .presets { margin-top: 9px; }
+    .card .head { padding: 12px 13px 8px; }
+    .card .body { padding: 2px 13px 14px; }
+    .verdict { font-size: 18px; padding: 6px 13px; }
+    .reason { font-size: 14.5px; }
+    .detail { font-size: 13.5px; }
+    .ev-quote { padding: 9px 10px; }
+    .ev-quote p { font-size: 13px; }
+    .meta-line { font-size: 10px; }
+    .watch-btn { width: auto; }
+    footer { font-size: 10.5px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="topbar">
+    <div class="brand"><span class="logo"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5 21 21"/></svg></span>AI 侦探社</div>
+    <span id="status-pill" class="pill">连接中…</span>
+  </div>
+
+  <div class="hero">
+    <h1>这条消息，靠谱吗？</h1>
+    <p class="sub">查公开资料，只给三种结论：对 · 错 · 不确定</p>
+  </div>
+
+  <div class="panel">
+    <div class="inputrow">
+      <textarea id="query" rows="2" placeholder="输入要查证的说法"></textarea>
+      <button id="btn" onclick="doCheck()">查证</button>
+    </div>
+    <div class="toolrow">
+      <button id="shot" type="button" onclick="pickShot()" title="上传截图，自动认出图里的说法" aria-label="上传截图"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M4 8h3l1.5-2h7L17 8h3v11H4z"/><circle cx="12" cy="13" r="3.4"/></svg></button>
+      <button id="mic" type="button" onclick="toggleVoice()" title="语音输入" aria-label="语音输入"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></svg></button>
+      <div class="modes">
+        <button type="button" id="mode-quick" class="mode-btn active" onclick="setMode('quick')"><span class="mode-name">快速</span></button>
+        <button type="button" id="mode-deep" class="mode-btn" onclick="setMode('deep')"><span class="mode-name">深度调查</span></button>
+      </div>
+    </div>
+    <div class="mode-note">
+      <span class="txt" id="mode-note">快速：10–20 秒，单轮检索，适合一句话能说清的说法。</span>
+      <button type="button" class="more" id="mode-help-btn" aria-expanded="false" aria-controls="mode-help" onclick="toggleModeHelp()">两种模式怎么选</button>
+    </div>
+    <div class="mode-help" id="mode-help">
+      <div class="mh-grid">
+        <div class="mh-card">
+          <div class="mh-t">快速查证<span>约 10–20 秒</span></div>
+          <ul>
+            <li>搜一轮，约 10 条资料</li>
+            <li>给结论、一句理由、依据原句、来源</li>
+            <li>适合：家常说法、想马上知道真假</li>
+          </ul>
+        </div>
+        <div class="mh-card">
+          <div class="mh-t">深度调查<span>约 30–90 秒</span></div>
+          <ul>
+            <li>拆成原话 / 机构说明 / 条件与反证三路并行搜</li>
+            <li>多一份报告：每路查了什么、命中几条、哪些来源重复</li>
+            <li>适合：有争议、要找反证、结论要拿去引用</li>
+          </ul>
+        </div>
+      </div>
+      <p class="pick">拿不准就先用<b>快速</b>；快速只给出“不确定”，再切<b>深度调查</b>多找几个角度。</p>
+    </div>
+    <input id="shot-file" type="file" accept="image/*" style="display:none" onchange="onShotPicked(event)">
+    <div id="shot-box" class="shot-box">
+      <img id="shot-thumb" class="shot-thumb" alt="截图预览">
+      <div class="shot-info">
+        <div id="shot-status" class="shot-status"></div>
+        <details id="shot-detail" class="shot-detail">
+          <summary>看看图里认出了什么字</summary>
+          <pre id="shot-ocr" class="shot-ocr"></pre>
+        </details>
+      </div>
+    </div>
+    <div id="voice-tip" class="voice-tip"></div>
+    <div class="presets" id="presets">
+      <span class="label">试试</span>
+    </div>
+    <p class="scope-line">只查公开说法，不查时政与个人私事；截图请先裁掉隐私。</p>
+  </div>
+
+  <div id="loading">
+    <div class="live-claim" id="live-claim"></div>
+    <div class="bar"></div>
+    <div class="msg" id="loading-msg">正在检索…</div>
+    <div id="live-sources"></div>
+  </div>
+
+  <div id="error"></div>
+
+  <div id="result">
+    <div class="card">
+      <div class="head">
+        <span class="case-file">查证结果</span>
+        <span id="r-verdict" class="verdict"></span>
+        <span id="r-mock" class="mockbadge" style="display:none">演示数据</span>
+      </div>
+      <div class="body">
+        <div class="q">查证对象：<b id="r-query"></b></div>
+        <div id="r-status" class="status-banner"></div>
+        <div class="reason" id="r-reason"></div>
+        <div class="detail" id="r-detail"></div>
+        <div class="sources" id="r-sources-wrap">
+          <h3>来源</h3>
+          <div id="r-sources"></div>
+        </div>
+        <div class="meta-line" id="r-meta"></div>
+        <div class="actions">
+          <button id="r-watch" class="watch-btn" type="button" onclick="addWatch()">关注这条</button>
+        </div>
+        <details class="rawbox" id="r-rawbox" style="display:none">
+          <summary>模型原始回答</summary>
+          <pre id="r-raw"></pre>
+        </details>
+      </div>
+    </div>
+  </div>
+
+  <div id="report" style="display:none">
+    <div class="card">
+      <div class="head">
+        <span class="case-file">调查报告</span>
+        <span id="p-verdict" class="verdict"></span>
+        <span id="p-conf" class="conf"></span>
+        <span id="p-mock" class="mockbadge" style="display:none">演示数据</span>
+      </div>
+      <div class="body">
+        <div class="q">调查对象：<b id="p-query"></b></div>
+        <div id="p-status" class="status-banner"></div>
+        <div class="reason" id="p-reason"></div>
+        <div class="detail" id="p-detail"></div>
+
+        <details class="trace">
+          <summary>调查过程</summary>
+          <div class="domains" id="p-domains-wrap" style="display:none">
+            <h3>识别领域与权威来源</h3>
+            <div id="p-domains"></div>
+          </div>
+          <div class="chain">
+            <h3>证据链</h3>
+            <div id="p-chain"></div>
+          </div>
+          <div class="rounds">
+            <h3>各轮检索</h3>
+            <div id="p-rounds"></div>
+          </div>
+        </details>
+
+        <div class="sources" id="p-sources-wrap">
+          <h3>来源</h3>
+          <div id="p-sources"></div>
+        </div>
+
+        <div class="meta-line" id="p-meta"></div>
+        <details class="rawbox" id="p-rawbox" style="display:none">
+          <summary>模型原始回答</summary>
+          <pre id="p-raw"></pre>
+        </details>
+      </div>
+    </div>
+  </div>
+
+  <details id="watch-log" style="display:none">
+    <summary>我的盯梢（复检后结论变化会标红）</summary>
+    <div id="watch-list"></div>
+  </details>
+
+  <details id="case-log" style="display:none">
+    <summary>本案卷宗（本次会话查过的案子）</summary>
+    <div id="history-list"></div>
+  </details>
+
+  <footer>
+    <div class="line">检索：元宝搜索（腾讯云） · 判定：<span id="llm-label">AI 模型</span></div>
+  </footer>
+</div>
+
+<script>
+// ===== 预设题库（短句，点一下就查）=====
+var PRESETS = [
+  "隔夜水不能喝",
+  "章鱼有三颗心脏",
+  "蜂蜜放久了不会变质",
+  "太空肉眼能看到长城",
+  "手机整夜充电会坏电池"
+];
+
+var VERDICT_STYLE = {
+  "对": { cls: "v-true", text: "结论：对", icon: "" },
+  "错": { cls: "v-false", text: "结论：错", icon: "" },
+  "不确定": { cls: "v-unsure", text: "结论：不确定", icon: "" }
+};
+
+// ===== 真假李逵对照台 + 结案印章 =====
+// 《水浒传》里李鬼冒李逵的名——假说法就像李鬼，看着像真的，其实不是。
+// 结论出来时点亮对应的一侧，再在报告右上角盖个章。
+var STAMP_TEXT = { "对": "证据支持", "错": "证据反驳", "不确定": "暂不能判定" };
+function normalizeVerdict(v) {
+  return ({ "真":"对", "假":"错", "说不准":"不确定", "没查到可靠来源":"不确定", "对":"对", "错":"错", "不确定":"不确定" })[v] || "不确定";
+}
+function normalizeCard(d) { d.verdict = normalizeVerdict(d.verdict); return d; }
+function safeUrl(value) {
+  try { var u = new URL(value, location.href); return /^https?:$/.test(u.protocol) ? u.href : ""; }
+  catch (_) { return ""; }
+}
+var _caseSeq = 0;
+function nextCaseNo() {
+  _caseSeq += 1;
+  var d = new Date();
+  function p(n) { return (n < 10 ? "0" : "") + n; }
+  var no = "00" + _caseSeq;
+  return "案号 #" + d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate()) + "-" + no.slice(-3);
+}
+
+function showVerdictPair(verdict, prefix) {
+  var kui = document.getElementById(prefix + "kg-true");
+  var gui = document.getElementById(prefix + "kg-false");
+  var stamp = document.getElementById(prefix + "stamp");
+  if (!kui || !gui || !stamp) { return; }
+  kui.classList.toggle("lit", verdict === "对");
+  gui.classList.toggle("lit", verdict === "错");
+  var txt = STAMP_TEXT[verdict];
+  if (txt) {
+    stamp.textContent = txt;
+    stamp.className = "stamp show" +
+      (verdict === "对" ? " stamp-true" : verdict === "错" ? " stamp-false" : "");
+  } else {
+    stamp.className = "stamp";
+  }
+}
+
+var LOADING_MSGS = [
+  "侦探正在翻资料…",
+  "在比对多个来源…",
+  "检查证据链是否完整…",
+  "整理查证卡…"
+];
+
+var caseLog = [];      // 本次会话的查证记录（不能叫 history，会和浏览器内置 window.history 冲突）
+var loadingTimer = null;
+
+// ===== 初始化 =====
+window.onload = function () {
+  var box = document.getElementById("presets");
+  PRESETS.slice(0, 3).forEach(function (p) {
+    var chip = document.createElement("span");
+    chip.className = "chip";
+    chip.textContent = p;
+    chip.onclick = function () {
+      document.getElementById("query").value = p;
+      doCheck();
+    };
+    box.appendChild(chip);
+  });
+
+  var input = document.getElementById("query");
+  input.addEventListener("keydown", function (e) {
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); doCheck(); }
+  });
+
+  initVoice();
+  initPasteImage();
+  initWatch();
+  loadStatus();
+};
+
+// ===== 语音输入（Web Speech API）=====
+// 原理：浏览器内置的语音识别服务，把麦克风的音实时转成文字。
+// 兼容性：Chrome / Edge 完整支持；Firefox 默认关闭；Safari 部分支持。
+// 限制：需要 https 或 localhost 环境（我们跑在 127.0.0.1，满足），
+//       且浏览器要联网（识别在服务端完成，不是本地离线识别）。
+var voiceRec = null;   // 当前识别实例
+var voiceFinal = "";   // 已确认的最终文本
+
+function initVoice() {
+  var mic = document.getElementById("mic");
+  var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) {
+    mic.classList.add("unsupported");
+    mic.title = "当前浏览器不支持语音输入，请用 Chrome 或 Edge";
+    mic.onclick = function () {
+      showVoiceTip("当前浏览器不支持语音输入，请换 Chrome 或 Edge 打开", true);
+    };
+    return;
+  }
+  mic.classList.remove("unsupported");
+  mic.title = "点击开始说话，再点一次结束";
+}
+
+function showVoiceTip(text, isError) {
+  var tip = document.getElementById("voice-tip");
+  tip.textContent = text;
+  tip.className = "voice-tip show" + (isError ? " error" : "");
+}
+
+function hideVoiceTip() {
+  var tip = document.getElementById("voice-tip");
+  tip.textContent = "";
+  tip.className = "voice-tip";
+}
+
+function toggleVoice() {
+  var mic = document.getElementById("mic");
+  if (mic.classList.contains("unsupported")) {
+    showVoiceTip("当前浏览器不支持语音输入，请换 Chrome 或 Edge 打开", true);
+    return;
+  }
+  if (voiceRec) {          // 正在录音 → 停止
+    voiceRec.stop();
+    return;
+  }
+  var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  voiceRec = new SR();
+  voiceRec.lang = "zh-CN";        // 中文普通话
+  voiceRec.continuous = false;    // 说完一段自动停
+  voiceRec.interimResults = true; // 实时显示中间结果，体验跟打字差不多
+  voiceFinal = "";
+
+  voiceRec.onstart = function () {
+    mic.classList.add("recording");
+    showVoiceTip("🎙️ 正在听…（再点一次麦克风结束）");
+  };
+
+  voiceRec.onresult = function (e) {
+    var interim = "";
+    for (var i = e.resultIndex; i < e.results.length; i++) {
+      if (e.results[i].isFinal) {
+        voiceFinal += e.results[i][0].transcript;
+      } else {
+        interim += e.results[i][0].transcript;
+      }
+    }
+    var box = document.getElementById("query");
+    var base = box.dataset.voiceBase || "";
+    box.value = (base + voiceFinal + interim).trim();
+    showVoiceTip(interim ? "识别中：" + interim : "✅ 已说完，正在落字…");
+  };
+
+  voiceRec.onerror = function (e) {
+    var msg = "语音识别出错：" + (e.error || "未知原因");
+    if (e.error === "not-allowed") msg = "麦克风权限被拒绝了。点地址栏左边的图标允许麦克风，再试一次";
+    else if (e.error === "network") msg = "语音识别服务连不上（它需要联网），检查网络后重试";
+    else if (e.error === "no-speech") msg = "没听到声音，靠近麦克风再说一次";
+    showVoiceTip(msg, true);
+  };
+
+  voiceRec.onend = function () {
+    mic.classList.remove("recording");
+    voiceRec = null;
+    var box = document.getElementById("query");
+    delete box.dataset.voiceBase;
+    if (voiceFinal.trim()) {
+      showVoiceTip("✅ 已转成文字，可以直接点「开始查证」，也可以改几个字再查");
+    } else {
+      hideVoiceTip();
+    }
+  };
+
+  // 记住开始录音前输入框里已有的内容，语音结果追加在后面而不是覆盖
+  var q = document.getElementById("query");
+  q.dataset.voiceBase = q.value ? q.value + " " : "";
+  try {
+    voiceRec.start();
+  } catch (err) {
+    voiceRec = null;
+    showVoiceTip("启动语音识别失败：" + err.message, true);
+  }
+}
+
+// ===== 截图查证：认出图里的说法，再交给查证流程 =====
+// 官方进阶挑战第二条："丢一张截图或一段视频里的说法，先认出再去查"。
+// 识别是本地 OCR 干的（图片不出本机），识别完把说法填进输入框，
+// 用户能看见"要查的到底是什么"，再决定查不查。
+
+var shotBusy = false;
+
+function pickShot() {
+  if (shotBusy) return;
+  document.getElementById("shot-file").click();
+}
+
+function onShotPicked(e) {
+  var f = e.target.files && e.target.files[0];
+  if (!f) return;
+  if (!/^image\//.test(f.type)) {
+    showShotStatus("请选一张图片（png / jpg 都行）", "err");
+    return;
+  }
+  compressImage(f, function (dataUrl, note) {
+    showShotBox(dataUrl);
+    showShotStatus("正在认图里的字…" + (note ? "（" + note + "）" : ""));
+    uploadShot(dataUrl);
+  });
+  // 清空 input，方便同一张图再选一次
+  e.target.value = "";
+}
+
+// 把大图压到 1600px 以内再上传：OCR 不需要原图分辨率，压完快好几倍
+function compressImage(file, cb) {
+  var reader = new FileReader();
+  reader.onload = function () {
+    var raw = reader.result;
+    var img = new Image();
+    img.onload = function () {
+      var maxSide = 1600;
+      var w = img.width, h = img.height;
+      var scale = Math.min(1, maxSide / Math.max(w, h));
+      w = Math.round(w * scale); h = Math.round(h * scale);
+      try {
+        var cv = document.createElement("canvas");
+        cv.width = w; cv.height = h;
+        cv.getContext("2d").drawImage(img, 0, 0, w, h);
+        var out = cv.toDataURL("image/jpeg", 0.88);
+        cb(out, scale < 1 ? "已压缩到 " + w + "×" + h : "");
+      } catch (err) {
+        cb(raw, "");     // canvas 不可用（极旧浏览器）就直接传原图
+      }
+    };
+    img.onerror = function () { cb(raw, ""); };
+    img.src = raw;
+  };
+  reader.onerror = function () {
+    showShotStatus("读不了这个文件，换一张试试", "err");
+  };
+  reader.readAsDataURL(file);
+}
+
+function uploadShot(dataUrl) {
+  shotBusy = true;
+  document.getElementById("shot").classList.add("busy");
+  fetch("/api/screenshot", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ image: dataUrl })
+  }).then(function (r) {
+    return r.json().then(function (d) { return { ok: r.ok, d: d }; });
+  }).then(function (res) {
+    shotBusy = false;
+    document.getElementById("shot").classList.remove("busy");
+    if (!res.ok) {
+      showShotStatus(res.d.error || "识别失败", "err");
+      return;
+    }
+    var box = document.getElementById("query");
+    box.value = res.d.claim || "";
+    box.focus();
+    var ocr = document.getElementById("shot-ocr");
+    ocr.textContent = (res.d.ocr_lines || []).join("\n");
+    document.getElementById("shot-detail").style.display = "block";
+    var tip = "✅ 认出来了：" + (res.d.claim || "");
+    if (res.d.warn) tip += "（" + res.d.warn + "）";
+    tip += "　—　确认没问题就点「开始查证」，想改可以改完再查";
+    showShotStatus(tip, "ok");
+    showVoiceTip("");
+  }).catch(function (err) {
+    shotBusy = false;
+    document.getElementById("shot").classList.remove("busy");
+    showShotStatus("上传失败：" + err.message + "（可以直接手打说法）", "err");
+  });
+}
+
+function showShotBox(src) {
+  var box = document.getElementById("shot-box");
+  box.classList.add("show");
+  document.getElementById("shot-thumb").src = src;
+  document.getElementById("shot-detail").style.display = "none";
+  document.getElementById("shot-ocr").textContent = "";
+}
+
+function showShotStatus(text, kind) {
+  var el = document.getElementById("shot-status");
+  el.textContent = text || "";
+  el.className = "shot-status" + (kind ? " " + kind : "");
+}
+
+// 支持 Ctrl+V 直接贴图：家族群截图一般是复制过来的，比存文件再选快
+function initPasteImage() {
+  document.addEventListener("paste", function (e) {
+    var items = (e.clipboardData && e.clipboardData.items) || [];
+    for (var i = 0; i < items.length; i++) {
+      if (items[i].type && items[i].type.indexOf("image") === 0) {
+        var f = items[i].getAsFile();
+        if (f) {
+          e.preventDefault();
+          compressImage(f, function (dataUrl, note) {
+            showShotBox(dataUrl);
+            showShotStatus("正在认图里的字…" + (note ? "（" + note + "）" : ""));
+            uploadShot(dataUrl);
+          });
+        }
+        return;
+      }
+    }
+  });
+}
+
+// ===== 持续盯梢：记住一批说法，随时复检，结论变了就提醒 =====
+// 官方进阶挑战第三条："每天自己去查，有变化就提醒"。
+// 我们的做法：把关心的说法存进浏览器 localStorage，一键复检，
+// 结论跟上次不一样就标红——不用守着页面，打开就能看到谁变了。
+// 为什么不做真正的后台定时：这是本地/demo 服务，没有常驻调度器；
+// 而且每次复检都要烧搜索额度，自动天天查会很快烧光。
+
+var lastResult = null;
+var WATCH_KEY = "detective_watch_v1";
+var WATCH_DUE_HOURS = 24;      // 超过一天没查就提示"该复检了"
+
+function loadWatch() {
+  try {
+    var raw = localStorage.getItem(WATCH_KEY);
+    var list = raw ? JSON.parse(raw) : [];
+    return Object.prototype.toString.call(list) === "[object Array]" ? list.filter(function (it) { return it && typeof it.query === "string"; }).map(function (it) { it.verdict = normalizeVerdict(it.verdict); if (it.prev) it.prev = normalizeVerdict(it.prev); return it; }) : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function saveWatch(list) {
+  try { localStorage.setItem(WATCH_KEY, JSON.stringify(list)); } catch (e) {}
+}
+
+function fmtAgo(ts) {
+  if (!ts) return "还没复检过";
+  var mins = Math.floor((Date.now() - ts) / 60000);
+  if (mins < 1) return "刚刚";
+  if (mins < 60) return mins + " 分钟前";
+  var hours = Math.floor(mins / 60);
+  if (hours < 24) return hours + " 小时前";
+  return Math.floor(hours / 24) + " 天前";
+}
+
+function addWatch() {
+  if (!lastResult || !lastResult.query) return;
+  var list = loadWatch();
+  for (var i = 0; i < list.length; i++) {
+    if (list[i].query === lastResult.query) {
+      markWatchBtn("已盯梢");
+      return;
+    }
+  }
+  list.unshift({
+    query: lastResult.query,
+    verdict: lastResult.verdict || null,
+    since: Date.now(),
+    checkedAt: lastResult.searched_at || "",
+    lastCheckTs: Date.now(),
+    prev: null,
+    changed: false
+  });
+  saveWatch(list);
+  renderWatch();
+  markWatchBtn("已盯梢");
+}
+
+function markWatchBtn(text) {
+  var b = document.getElementById("r-watch");
+  if (!b) return;
+  b.textContent = "📌 " + text;
+  b.classList.add("done");
+}
+
+function renderWatch() {
+  var list = loadWatch();
+  var wrap = document.getElementById("watch-log");
+  var box = document.getElementById("watch-list");
+  if (!wrap || !box) return;
+  if (!list.length) {
+    wrap.style.display = "none";
+    box.innerHTML = "";
+    return;
+  }
+  wrap.style.display = "block";
+  box.innerHTML = "";
+  list.forEach(function (it, idx) {
+    var div = document.createElement("div");
+    var due = it.lastCheckTs && (Date.now() - it.lastCheckTs) > WATCH_DUE_HOURS * 3600000;
+    div.className = "watch-item" + (it.changed ? " changed" : (due ? " due" : ""));
+
+    var top = document.createElement("div");
+    top.className = "watch-top";
+    var q = document.createElement("div");
+    q.className = "watch-q";
+    q.textContent = it.query;
+    var acts = document.createElement("div");
+    acts.className = "watch-actions";
+    var btn = document.createElement("button");
+    btn.type = "button";
+    btn.textContent = "复检";
+    btn.onclick = function () { recheckWatch(idx, btn); };
+    var del = document.createElement("button");
+    del.type = "button";
+    del.textContent = "取消";
+    del.onclick = function () { removeWatch(idx); };
+    acts.appendChild(btn);
+    acts.appendChild(del);
+    top.appendChild(q);
+    top.appendChild(acts);
+
+    var bot = document.createElement("div");
+    bot.className = "watch-bot";
+    var badge = document.createElement("span");
+    var cls = VERDICT_STYLE[it.verdict] ? VERDICT_STYLE[it.verdict].cls : "v-unknown";
+    badge.className = "watch-badge " + cls;
+    badge.textContent = it.verdict || "结论待确认";
+    bot.appendChild(badge);
+    var when = document.createElement("span");
+    when.textContent = "上次查：" + fmtAgo(it.lastCheckTs) +
+      (due && !it.changed ? "（超过一天了，点复检看看有没有变）" : "");
+    bot.appendChild(when);
+
+    div.appendChild(top);
+    div.appendChild(bot);
+
+    if (it.changed && it.prev) {
+      var note = document.createElement("div");
+      note.className = "watch-changed-note";
+      note.textContent = "⚠️ 结论变了：" + it.prev + " → " + it.verdict;
+      div.appendChild(note);
+    }
+    box.appendChild(div);
+  });
+}
+
+function recheckWatch(idx, btn) {
+  var list = loadWatch();
+  var it = list[idx];
+  if (!it) return;
+  if (btn) { btn.disabled = true; btn.textContent = "查…"; }
+  fetch("/api/check", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ query: it.query })
+  }).then(function (r) {
+    return r.json().then(function (d) { return { ok: r.ok, d: d }; });
+  }).then(function (res) {
+    if (!res.ok) {
+      if (btn) { btn.disabled = false; btn.textContent = "复检"; }
+      showError(res.d.error || "复检失败，稍后再试");
+      return;
+    }
+    if (res.d.blocked) { showNotice(res.d.notice); if (btn) { btn.disabled = false; btn.textContent = "复检"; } return; }
+    if (res.d.status === "incomplete") { showError("本次复检未完成，保留上一次结论。"); if (btn) { btn.disabled = false; btn.textContent = "复检"; } return; }
+    var now = normalizeVerdict(res.d.verdict);
+    it.prev = normalizeVerdict(it.verdict);
+    it.verdict = now;
+    it.changed = !!(it.prev && now && it.prev !== now);
+    it.lastCheckTs = Date.now();
+    it.checkedAt = res.d.searched_at || "";
+    list[idx] = it;
+    saveWatch(list);
+    renderWatch();
+  }).catch(function (err) {
+    if (btn) { btn.disabled = false; btn.textContent = "复检"; }
+    showError("复检失败：" + err.message);
+  });
+}
+
+function removeWatch(idx) {
+  var list = loadWatch();
+  list.splice(idx, 1);
+  saveWatch(list);
+  renderWatch();
+}
+
+function initWatch() {
+  renderWatch();
+}
+
+function loadStatus() {
+  fetch("/api/status").then(function (r) { return r.json(); }).then(function (s) {
+    var pill = document.getElementById("status-pill");
+    if (s.mock) {
+      pill.textContent = "演示数据";
+      pill.className = "pill mock";
+    } else if (s.has_keys) {
+      pill.textContent = "真实";
+      pill.title = "服务正常，可以真实查证";
+      pill.className = "pill real";
+    } else {
+      pill.textContent = "未配置";
+      pill.className = "pill warn";
+    }
+    var label = document.getElementById("llm-label");
+    if (label) {
+      // 不在页面上展示具体供应商或模型版本，避免把内部配置暴露给访客。
+      label.textContent = "AI 模型";
+    }
+  }).catch(function () {
+    document.getElementById("status-pill").textContent = "服务未连接";
+  });
+}
+
+// ===== 模式切换：快速查证 / 深度调查 =====
+var MODE = "quick";
+var MODE_NOTES = {
+  quick: "快速：10–20 秒，单轮检索，适合一句话能说清的说法。",
+  deep: "深度：30–90 秒，三路并行搜，适合有争议、要找反证的说法。"
+};
+function setMode(m) {
+  MODE = m;
+  document.getElementById("mode-quick").classList.toggle("active", m === "quick");
+  document.getElementById("mode-deep").classList.toggle("active", m === "deep");
+  document.getElementById("btn").textContent = m === "deep" ? "调查" : "查证";
+  var note = document.getElementById("mode-note");
+  if (note) note.textContent = MODE_NOTES[m] || "";
+  hideError();
+}
+
+function toggleModeHelp() {
+  var box = document.getElementById("mode-help");
+  var btn = document.getElementById("mode-help-btn");
+  if (!box || !btn) return;
+  var open = box.classList.toggle("show");
+  btn.setAttribute("aria-expanded", open ? "true" : "false");
+  btn.textContent = open ? "收起对比" : "两种模式怎么选";
+}
+
+// 同一请求逐行读取，不因缺少流读取能力而重复发送付费查询。
+async function readCheckStream(url, query, onEvent) {
+  var response = await fetch(url, { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({query:query}) });
+  if (!response.ok || !(response.headers.get("content-type") || "").includes("ndjson")) {
+    var ordinary = await response.json();
+    if (!response.ok) { throw new Error(ordinary.error || "请求失败"); }
+    return ordinary;
+  }
+  var result = null;
+  function line(text) {
+    if (!text.trim()) return;
+    var event = JSON.parse(text);
+    if (event.type === "result") result = event.result;
+    else onEvent(event);
+  }
+  if (!response.body || !response.body.getReader) {
+    (await response.text()).split("\n").forEach(line);
+  } else {
+    var reader = response.body.getReader(), decoder = new TextDecoder(), pending = "";
+    try {
+      while (true) {
+        var chunk = await reader.read();
+        pending += decoder.decode(chunk.value || new Uint8Array(), {stream:!chunk.done});
+        var lines = pending.split("\n"); pending = lines.pop(); lines.forEach(line);
+        if (chunk.done) break;
+      }
+      if (pending.trim()) line(pending);
+    } finally { reader.releaseLock(); }
+  }
+  if (!result) throw new Error("连接中断，本次调查未完成；不能据此判断说法对错。");
+  return result;
+}
+
+// ===== 查证 =====
+function doCheck() {
+  if (document.getElementById("btn").disabled) return;
+  var q = document.getElementById("query").value.trim();
+  if (!q) { showError("先输入一条要查证的说法"); return; }
+
+  hideError();
+  var btn = document.getElementById("btn");
+  btn.disabled = true;
+  btn.textContent = MODE === "deep" ? "调查中…" : "查证中…";
+  document.getElementById("result").style.display = "none";
+  document.getElementById("report").style.display = "none";
+  document.getElementById("loading").style.display = "block";
+  document.getElementById("live-claim").textContent = "正在查证：" + q;
+  document.getElementById("live-sources").innerHTML = "";
+
+  var requestMode = MODE;
+  var started = Date.now();
+  var progressMessage = "正在检索";
+  function paintProgress() {
+    document.getElementById("loading-msg").textContent =
+      progressMessage + " · " + Math.floor((Date.now() - started) / 1000) + " 秒";
+  }
+  paintProgress();
+  loadingTimer = setInterval(paintProgress, 500);
+  var liveList = null, liveSummary = null, liveCount = 0, liveSeen = {};
+  function addLiveSources(sources) {
+    if (!sources || !sources.length) return;
+    if (!liveList) {
+      var box = document.createElement("details");
+      box.className = "live-src";
+      liveSummary = document.createElement("summary");
+      liveSummary.textContent = "已找到的资料";
+      var list = document.createElement("div");
+      list.className = "list";
+      box.appendChild(liveSummary); box.appendChild(list);
+      document.getElementById("live-sources").appendChild(box);
+      liveList = list;
+    }
+    sources.forEach(function (source) {
+      var key = (source.no || "") + "|" + (source.url || "");
+      if (liveSeen[key]) return;
+      liveSeen[key] = 1; liveCount += 1;
+      var a = document.createElement("a");
+      a.href = safeUrl(source.url); a.target = "_blank"; a.rel = "noopener noreferrer";
+      a.textContent = "[" + (source.no || liveCount) + "] " + (source.title || source.url);
+      liveList.appendChild(a);
+    });
+    liveSummary.textContent = "已找到 " + liveCount + " 条资料（结论还在核对）";
+  }
+  function onEvent(event) {
+    if (event.type === "error") { throw new Error(event.error || "本次调查未完成"); }
+    if (event.type === "progress") {
+      progressMessage = event.message || "服务正在处理";
+      paintProgress();
+      if (event.sources) addLiveSources(event.sources);
+    }
+  }
+  readCheckStream((requestMode === "deep" ? "/api/investigate" : "/api/check") + "/stream", q, onEvent)
+  .then(function (data) {
+    if (data.blocked) { showNotice(data.notice); return; }
+    if (requestMode === "deep") { renderReport(data); } else { renderResult(data); }
+    addHistory(data);
+  }).catch(function (e) {
+    showError(e.message);
+  }).finally(function () {
+    clearInterval(loadingTimer);
+    btn.disabled = false;
+    btn.textContent = MODE === "deep" ? "调查" : "查证";
+    document.getElementById("loading").style.display = "none";
+  });
+}
+
+// ===== 渲染查证卡 =====
+function incompleteText(d) {
+  // 分清“服务忙”和“资料/核对没完成”，避免一句笼统提示让用户以为结论被否掉。
+  var raw = [d.reason, d.uncertainty_reason, d.llm_error].filter(Boolean).join(" ");
+  var wait = raw.match(/请在\s*(\d+)\s*秒后再试/);
+  if (wait) {
+    return "这次没查完：查证服务正在限流排队，约 " + wait[1] + " 秒后可再试。这不是把这句话判成错的。";
+  }
+  if (/正在处理其他请求|服务正忙|busy/i.test(raw)) {
+    return "这次没查完：同时提交的查证较多，服务正忙。等十几秒再点一次即可，不是这句话被判错了。";
+  }
+  if (/演示模式/.test(raw)) {
+    return "当前是演示数据，没有真实证据，不能据此判断对错。配置真实检索后再查一次。";
+  }
+  if (/格式异常|结构化|非JSON|invalid_evidence_format/i.test(raw)) {
+    return "这次没查完：返回内容格式异常，已经丢弃，不能当作结论。稍后再试一次。";
+  }
+  if (/部分检索失败/.test(raw)) {
+    return "这次没查完：有一路检索失败，不能声称所有角度都查过。稍后再试一次。";
+  }
+  if (/长度限制|超过.{0,12}字符/.test(raw)) {
+    return "这次没查完：资料太长，超出可核对范围，无法排除未纳入的反证。换个更具体的问法再试。";
+  }
+  if (/检索失败|搜索服务失败|搜索服务/.test(raw)) {
+    return "这次没查完：搜索服务没有正常返回，资料没拿到，不能据此判断对错。稍后再试一次。";
+  }
+  if (/超时|不可用/.test(raw)) {
+    return "这次没查完：判断服务在时限内没有给出可核验的结论，不能据此判断对错。稍后再试一次。";
+  }
+  return "本次没查完（服务繁忙或资料不足），不能据此判断对错。稍后可以再试一次。";
+}
+
+function setStatusBanner(id, d) {
+  var el = document.getElementById(id);
+  if (!el) return;
+  if (d.status === "incomplete") {
+    el.className = "status-banner show";
+    el.textContent = incompleteText(d);
+  } else {
+    el.className = "status-banner";
+    el.textContent = "";
+  }
+}
+
+function citedSourceNos(d) {
+  var set = {};
+  ((d.evidence_audit || {}).evidence || []).forEach(function (e) {
+    if (e && e.quote_verified && e.quote && e.source_no) set[e.source_no] = 1;
+  });
+  String(d.detail || "").replace(/\[(\d+)\]/g, function (m, n) {
+    set[parseInt(n, 10)] = 1;
+    return m;
+  });
+  return set;
+}
+
+function sourceRow(s, fallbackNo) {
+  var row = document.createElement("div");
+  row.className = "src";
+  var no = document.createElement("span");
+  no.className = "no";
+  no.textContent = s.no || fallbackNo;
+  row.appendChild(no);
+  var a = document.createElement("a");
+  a.href = safeUrl(s.url);
+  a.target = "_blank";
+  a.rel = "noopener noreferrer";
+  a.textContent = s.title || s.url;
+  row.appendChild(a);
+  if (s.site) {
+    var meta = document.createElement("span");
+    meta.className = "meta";
+    meta.textContent = s.site;
+    row.appendChild(meta);
+  }
+  return row;
+}
+
+function renderSources(boxId, d) {
+  var box = document.getElementById(boxId);
+  if (!box) return;
+  box.innerHTML = "";
+  var list = d.sources || [];
+  if (!list.length) return;
+  var cited = citedSourceNos(d);
+  var used = [], rest = [];
+  if (Object.keys(cited).length) {
+    list.forEach(function (s) { (cited[s.no] ? used : rest).push(s); });
+  } else {
+    used = list.slice(0, 3);
+    rest = list.slice(3);
+  }
+  if (used.length > 4) {
+    rest = used.slice(4).concat(rest);
+    used = used.slice(0, 4);
+  }
+  used.forEach(function (s, i) { box.appendChild(sourceRow(s, i + 1)); });
+  if (rest.length) {
+    var more = document.createElement("details");
+    more.className = "src-more";
+    var sum = document.createElement("summary");
+    sum.textContent = "另外 " + rest.length + " 条检索到的资料";
+    more.appendChild(sum);
+    rest.forEach(function (s, i) { more.appendChild(sourceRow(s, used.length + i + 1)); });
+    box.appendChild(more);
+  }
+}
+
+function renderDetail(d, element) {
+  element.innerHTML = "";
+  // 不确定/未完成时，模型解释多为内部核对术语，不再占据主视线；依据原句仍完整保留。
+  var hideText = d.status === "incomplete" || d.verdict === "不确定";
+  if (!hideText && String(d.detail || "").trim()) {
+    var text = document.createElement("div");
+    text.className = "detail-text";
+    text.innerHTML = linkify(d.detail || "", d.sources || []);
+    element.appendChild(text);
+    if (text.textContent.length > 150) {
+      text.classList.add("clamp");
+      var fold = document.createElement("span");
+      fold.className = "detail-fold";
+      fold.textContent = "展开说明";
+      fold.onclick = function () {
+        var open = text.classList.toggle("clamp") === false;
+        fold.textContent = open ? "收起" : "展开说明";
+      };
+      element.appendChild(fold);
+    }
+  }
+  renderEvidenceAudit(d, element);
+}
+
+function renderResult(d) {
+  normalizeCard(d);
+  document.body.classList.add("has-result");
+  lastResult = d;          // 盯梢要用：把这次的结论存下来
+  document.getElementById("r-query").textContent = d.query;
+
+  var v = document.getElementById("r-verdict");
+  var style = VERDICT_STYLE[d.verdict];
+  if (d.status === "incomplete") {
+    v.className = "verdict v-unknown";
+    v.innerHTML = '<span class="icon">…</span>未完成';
+  } else if (style) {
+    v.className = "verdict " + style.cls;
+    v.innerHTML = '<span class="icon">' + style.icon + "</span>" + style.text;
+  } else {
+    v.className = "verdict v-unknown";
+    v.innerHTML = '<span class="icon">⚠️</span>结论待确认';
+  }
+
+  document.getElementById("r-mock").style.display = d.mock ? "inline-block" : "none";
+  setStatusBanner("r-status", d);
+  var reasonEl = document.getElementById("r-reason");
+  if (d.status === "incomplete") {
+    reasonEl.textContent = "";
+    reasonEl.style.display = "none";
+  } else {
+    reasonEl.style.display = "";
+    reasonEl.textContent = d.reason || "（模型没有给出单独的理由）";
+  }
+
+  // 详情里的 [1][2] 编号变成可点开的来源链接
+  var detail = document.getElementById("r-detail");
+  renderDetail(d, detail);
+
+  renderSources("r-sources", d);
+  document.getElementById("r-sources-wrap").style.display =
+    (d.sources && d.sources.length) ? "block" : "none";
+
+  var meta = document.getElementById("r-meta");
+  var bits = [];
+  if (d.timings && d.timings.total) bits.push(Math.round(d.timings.total) + " 秒");
+  if (d.sources && d.sources.length) bits.push(d.sources.length + " 条资料");
+  if (d.status === "incomplete") bits.push("未完成");
+  meta.textContent = bits.join(" · ");
+  meta.title = d.runtime_version || "";
+
+  // 盯梢按钮状态：这条已经在盯梢列表里就显示"已关注"
+  var wb = document.getElementById("r-watch");
+  if (wb) {
+    var watched = loadWatch().some(function (it) { return it.query === d.query; });
+    wb.textContent = watched ? "✓ 已关注" : "关注这条";
+    wb.className = "watch-btn" + (watched ? " done" : "");
+  }
+
+  // 结论没解析出来时，展示模型原文，不藏着；大模型报错时只提示原因，证据照常列出
+  var rawbox = document.getElementById("r-rawbox");
+  if (d.llm_error) {
+    document.getElementById("r-raw").textContent = d.llm_error;
+    rawbox.style.display = "none";
+  } else if (!d.verdict) {
+    document.getElementById("r-raw").textContent = d.answer_raw || "（空）";
+    rawbox.style.display = "block";
+    rawbox.open = true;
+  } else {
+    document.getElementById("r-raw").textContent = d.answer_raw || "";
+    rawbox.style.display = "none";
+    rawbox.open = false;
+  }
+
+  var resultBox = document.getElementById("result");
+  resultBox.style.display = "block";
+  safeScroll(resultBox);
+}
+
+function esc(s) {
+  // 转义 HTML 特殊字符，防止来源名里带 < > & 时把页面结构弄坏
+  return String(s == null ? "" : s)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function renderEvidenceAudit(d, element) {
+  // 算术结论由程序精确计算，不需要也不应该用网页引文充当证明；计算说明已在上方 detail。
+  if (d.verification_method === "exact_arithmetic") return;
+  var panel = document.createElement("section");
+  panel.className = "evidence-explanation";
+
+  var top = document.createElement("div");
+  top.className = "ev-top";
+  var heading = document.createElement("span");
+  heading.className = "ev-title";
+  heading.textContent = "依据";
+  var strength = document.createElement("span");
+  strength.className = "ev-strength";
+  strength.textContent = "证据支持程度：" +
+    (d.evidence_strength || (d.status === "incomplete" ? "未完成" : "有限"));
+  top.appendChild(heading);
+  top.appendChild(strength);
+  panel.appendChild(top);
+
+  var items = ((d.evidence_audit || {}).evidence || []).filter(function (e) {
+    return e && (e.quote || e.source_no);
+  });
+  var verified = items.filter(function (e) { return e.quote_verified && e.quote; });
+  var unverified = items.filter(function (e) { return !(e.quote_verified && e.quote); });
+  var srcByNo = {};
+  (d.sources || []).forEach(function (s) { srcByNo[s.no] = s; });
+
+  function quoteCard(e) {
+    var card = document.createElement("div");
+    card.className = "ev-quote";
+    var text = document.createElement("p");
+    text.textContent = e.quote || "（模型没有给出原句）";
+    var longQuote = String(e.quote || "").length > 140;
+    if (longQuote) text.className = "clamp";
+    card.appendChild(text);
+    if (longQuote) {
+      var fold = document.createElement("span");
+      fold.className = "ev-fold";
+      fold.textContent = "展开全文";
+      fold.onclick = function () {
+        var open = text.classList.toggle("clamp") === false;
+        fold.textContent = open ? "收起" : "展开全文";
+      };
+      card.appendChild(fold);
+    }
+    var meta = document.createElement("div");
+    meta.className = "ev-meta";
+    var tag = document.createElement("span");
+    var stance = e.stance === "支持" ? "支持" : e.stance === "反对" ? "反驳" : "背景";
+    tag.className = "ev-tag " + (stance === "支持" ? "support" : stance === "反驳" ? "oppose" : "neutral");
+    tag.textContent = stance;
+    meta.appendChild(tag);
+    var direct = document.createElement("span");
+    direct.textContent = e.direct ? "直接证据" : "背景资料";
+    meta.appendChild(direct);
+    var src = srcByNo[e.source_no];
+    if (src && safeUrl(src.url)) {
+      var a = document.createElement("a");
+      a.href = safeUrl(src.url);
+      a.target = "_blank";
+      a.rel = "noopener noreferrer";
+      a.textContent = "[" + e.source_no + "] " + (src.title || src.site || "来源");
+      meta.appendChild(a);
+    } else {
+      var plain = document.createElement("span");
+      plain.textContent = "[" + e.source_no + "] 来源";
+      meta.appendChild(plain);
+    }
+    card.appendChild(meta);
+    return card;
+  }
+
+  var mainQuotes = verified.slice(0, 2);
+  if (mainQuotes.length) {
+    mainQuotes.forEach(function (e) { panel.appendChild(quoteCard(e)); });
+  } else {
+    var none = document.createElement("p");
+    none.className = "ev-intro";
+    none.textContent = d.status === "incomplete"
+      ? "本次没有完成引文核对。"
+      : "没有找到能和资料逐字对上的原句。";
+    panel.appendChild(none);
+  }
+
+  if (verified.length > 2) {
+    var more = document.createElement("details");
+    more.className = "ev-more";
+    var sum = document.createElement("summary");
+    sum.textContent = "更多依据（" + (verified.length - 2) + "）";
+    more.appendChild(sum);
+    verified.slice(2).forEach(function (e) { more.appendChild(quoteCard(e)); });
+    panel.appendChild(more);
+  }
+
+  if (unverified.length) {
+    var unused = document.createElement("details");
+    unused.className = "ev-more";
+    var usum = document.createElement("summary");
+    usum.textContent = "未采用的引文（" + unverified.length + "）";
+    unused.appendChild(usum);
+    unverified.forEach(function (e) { unused.appendChild(quoteCard(e)); });
+    panel.appendChild(unused);
+  }
+
+  var extra = [];
+  if (d.status === "incomplete" || d.verdict === "不确定") {
+    var basis = (d.evidence_basis || []).filter(function (t) { return t && String(t).trim(); });
+    if (basis.length) {
+      var basisBox = document.createElement("div");
+      basisBox.className = "ev-basis";
+      basis.forEach(function (text) {
+        var p = document.createElement("p");
+        p.textContent = text;
+        basisBox.appendChild(p);
+      });
+      extra.push(basisBox);
+    }
+    if (d.uncertainty_reason) {
+      var why = document.createElement("p");
+      why.className = "ev-why";
+      why.textContent = (d.status === "incomplete" ? "为什么没查完：" : "为什么不确定：") + d.uncertainty_reason;
+      extra.push(why);
+    }
+  }
+
+  var steps = d.next_steps || [];
+  if (steps.length) {
+    var next = document.createElement("h4");
+    next.textContent = "怎么自己核验";
+    var list = document.createElement("ol");
+    steps.forEach(function (text) {
+      var item = document.createElement("li");
+      item.textContent = text;
+      list.appendChild(item);
+    });
+    extra.push(next);
+    extra.push(list);
+  }
+
+  // 解释和核验建议默认收起，结果卡只留结论、理由、依据、来源。
+  if (extra.length) {
+    var help = document.createElement("details");
+    help.className = "ev-more ev-help";
+    var helpSum = document.createElement("summary");
+    helpSum.textContent = "为什么这样判断 / 怎么自己核验";
+    help.appendChild(helpSum);
+    extra.forEach(function (node) { help.appendChild(node); });
+    panel.appendChild(help);
+  }
+
+  var boundary = document.createElement("small");
+  boundary.textContent = "依据为搜索摘要，非全文核验；引文对上不代表语义判断一定正确。";
+  panel.appendChild(boundary);
+  element.appendChild(panel);
+}
+
+function linkify(text, sources) {
+  var esc = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  return esc.replace(/\[(\d+)\]/g, function (m, n) {
+    var idx = parseInt(n, 10) - 1;
+    if (sources[idx] && sources[idx].url) {
+      return '<a class="cite" href="' + safeUrl(sources[idx].url).replace(/&/g,"&amp;").replace(/"/g,"&quot;") + '" target="_blank" rel="noopener noreferrer">[' + n + "]</a>";
+    }
+    return m;
+  });
+}
+
+// ===== 渲染深度调查报告 =====
+function renderReport(d) {
+  normalizeCard(d);
+  document.body.classList.add("has-result");
+  lastResult = d;
+  document.getElementById("p-query").textContent = d.query;
+
+  var v = document.getElementById("p-verdict");
+  var style = VERDICT_STYLE[d.verdict];
+  if (d.status === "incomplete") {
+    v.className = "verdict v-unknown";
+    v.innerHTML = '<span class="icon">…</span>未完成';
+  } else if (style) {
+    v.className = "verdict " + style.cls;
+    v.innerHTML = '<span class="icon">' + style.icon + "</span>" + style.text;
+  } else {
+    v.className = "verdict v-unknown";
+    v.innerHTML = '<span class="icon">⚠️</span>结论待确认';
+  }
+  document.getElementById("p-mock").style.display = d.mock ? "inline-block" : "none";
+  setStatusBanner("p-status", d);
+  var pReason = document.getElementById("p-reason");
+  if (d.status === "incomplete") {
+    pReason.textContent = "";
+    pReason.style.display = "none";
+  } else {
+    pReason.style.display = "";
+    pReason.textContent = d.reason || "（模型没有给出单独的理由）";
+  }
+  renderDetail(d, document.getElementById("p-detail"));
+
+  // 领域识别 + 权威信源清单
+  var dw = document.getElementById("p-domains-wrap");
+  var dbox = document.getElementById("p-domains");
+  dbox.innerHTML = "";
+  if (d.domain_summary && d.domain_summary.length) {
+    dw.style.display = "block";
+    d.domain_summary.forEach(function (dom) {
+      var card = document.createElement("div");
+      card.className = "domain-card";
+      var t = document.createElement("div");
+      t.className = "domain-title";
+      t.textContent = "识别领域：" + dom.label;
+      card.appendChild(t);
+      if (dom.cn && dom.cn.length) {
+        var c = document.createElement("div");
+        c.className = "domain-line";
+        c.innerHTML = "<b>中国权威信源</b>" + esc(dom.cn.join("、"));
+        card.appendChild(c);
+      }
+      if (dom.global_ && dom.global_.length) {
+        var g = document.createElement("div");
+        g.className = "domain-line";
+        g.innerHTML = "<b>国际权威信源</b>" + esc(dom.global_.join("、"));
+        card.appendChild(g);
+      }
+      dbox.appendChild(card);
+    });
+  } else {
+    dw.style.display = "none";
+  }
+
+  // 证据链
+  var chain = document.getElementById("p-chain");
+  chain.innerHTML = "";
+  (d.steps || []).forEach(function (s) {
+    var row = document.createElement("div");
+    row.className = "chain-step";
+    var no = document.createElement("span");
+    no.className = "chain-no";
+    no.textContent = s.no;
+    var name = document.createElement("span");
+    name.className = "chain-name";
+    name.textContent = s.name;
+    var det = document.createElement("span");
+    det.className = "chain-detail";
+    det.textContent = s.detail || "";
+    row.appendChild(no); row.appendChild(name); row.appendChild(det);
+    chain.appendChild(row);
+  });
+
+  // 各轮检索
+  var rounds = document.getElementById("p-rounds");
+  rounds.innerHTML = "";
+  (d.rounds || []).forEach(function (rd) {
+    var box = document.createElement("div");
+    box.className = rd.kind === "backfill" ? "round round-backfill" : "round";
+    var head = document.createElement("div");
+    head.className = "round-head";
+    var no = document.createElement("span");
+    no.className = "round-no";
+    no.textContent = rd.kind === "backfill" ? "信源补齐" : "第 " + rd.no + " 轮";
+    var q = document.createElement("span");
+    q.className = "round-q";
+    q.textContent = rd.query;
+    var hits = document.createElement("span");
+    hits.className = "round-hits";
+    hits.textContent = "命中 " + rd.hits + " 条";
+    head.appendChild(no); head.appendChild(q); head.appendChild(hits);
+    box.appendChild(head);
+    if (rd.industry) {
+      var tag = document.createElement("div");
+      tag.className = "round-reason";
+      tag.textContent = "信源方向：" + rd.industry;
+      box.appendChild(tag);
+    }
+    if (rd.site) {
+      var st = document.createElement("div");
+      st.className = "round-reason";
+      st.textContent = "定向站点：" + rd.site + "（计划轮次没捞到权威信源，改用站点限定补查）";
+      box.appendChild(st);
+    }
+    if (rd.reason) {
+      var why = document.createElement("div");
+      why.className = "round-reason";
+      why.textContent = "为什么查这个：" + rd.reason;
+      box.appendChild(why);
+    }
+    rounds.appendChild(box);
+  });
+
+  // 交叉验证
+  if (d.duplicates && d.duplicates.length) {
+    var dup = document.createElement("div");
+    dup.className = "round";
+    var dh = document.createElement("div");
+    dh.className = "round-head";
+    var dn = document.createElement("span");
+    dn.className = "round-no";
+    dn.textContent = "交叉验证";
+    var dt = document.createElement("span");
+    dt.className = "round-q";
+    dt.textContent = "发现 " + d.duplicates.length + " 组重复或相似线索；不能据此认证来源独立性";
+    dh.appendChild(dn); dh.appendChild(dt);
+    dup.appendChild(dh);
+    d.duplicates.forEach(function (g) {
+      var line = document.createElement("div");
+      line.className = "round-reason";
+      line.textContent = "[" + g.nos.join("]、[") + "] " + g.kind;
+      dup.appendChild(line);
+    });
+    rounds.appendChild(dup);
+  }
+
+  // 来源：优先列出被引用的，其余折叠
+  renderSources("p-sources", d);
+  document.getElementById("p-sources-wrap").style.display =
+    (d.sources && d.sources.length) ? "block" : "none";
+
+  var meta = document.getElementById("p-meta");
+  var bits = [];
+  if (d.timings && d.timings.total) bits.push(Math.round(d.timings.total) + " 秒");
+  if (d.sources && d.sources.length) bits.push(d.sources.length + " 条资料");
+  if (d.status === "incomplete") bits.push("未完成");
+  meta.textContent = bits.join(" · ");
+  meta.title = d.runtime_version || "";
+
+  var rawbox = document.getElementById("p-rawbox");
+  if (d.llm_error) {
+    document.getElementById("p-raw").textContent = d.llm_error;
+    rawbox.style.display = "none";
+  } else if (!d.verdict) {
+    document.getElementById("p-raw").textContent = d.answer_raw || "（空）";
+    rawbox.style.display = "block";
+    rawbox.open = true;
+  } else {
+    document.getElementById("p-raw").textContent = d.answer_raw || "";
+    rawbox.style.display = "none";
+    rawbox.open = false;
+  }
+
+  var reportBox = document.getElementById("report");
+  reportBox.style.display = "block";
+  safeScroll(reportBox);
+}
+
+// ===== 历史记录 =====
+function addHistory(d) {
+  normalizeCard(d);
+  caseLog.unshift(d);
+  if (caseLog.length > 8) { caseLog.pop(); }
+  var box = document.getElementById("case-log");
+  var list = document.getElementById("history-list");
+  list.innerHTML = "";
+  caseLog.forEach(function (item) {
+    var row = document.createElement("div");
+    row.className = "hist-item";
+    var q = document.createElement("span");
+    q.className = "q";
+    q.textContent = item.query;
+    row.appendChild(q);
+    var v = document.createElement("span");
+    v.className = "v";
+    v.textContent = (item.mode === "investigate" ? "调查 · " : "") +
+      (item.status === "incomplete" ? "未完成" : (item.verdict || "待确认"));
+    v.style.color = (VERDICT_STYLE[item.verdict] || {}).cls === "v-false" ? "#b91c1c" :
+      (VERDICT_STYLE[item.verdict] || {}).cls === "v-true" ? "#15803d" : "#6b7280";
+    row.appendChild(v);
+    row.onclick = function () {
+      if (item.mode === "investigate") { renderReport(item); } else { renderResult(item); }
+    };
+    list.appendChild(row);
+  });
+  box.style.display = "block";
+}
+
+// ===== 工具 =====
+function safeScroll(el) {
+  // 结果卡比一屏高时，scrollIntoView 会为了露出底部把整页往上推，
+  // 搜索框和截图/语音/模式切换会被顶出屏幕。这里改成有上限的滚动：
+  // 最多滚到“工具行刚好留在视口顶部”，结果卡开头照样能看到。
+  if (!el || typeof window.scrollTo !== "function") return;
+  var rect = el.getBoundingClientRect();
+  // 结果卡开头已经在视口里：保持不动，搜索框和四个控件都留在原位。
+  if (rect.top < window.innerHeight - 80) return;
+  var target = window.scrollY + rect.top - 12;
+  var tool = document.querySelector(".toolrow");
+  if (tool && tool.offsetParent !== null) {
+    var toolTop = window.scrollY + tool.getBoundingClientRect().top;
+    if (isFinite(toolTop)) target = Math.min(target, toolTop - 8);
+  }
+  if (target <= window.scrollY + 4) return; // 已经能看到结果卡开头，不再往下滚
+  try { window.scrollTo({ top: Math.max(0, target), behavior: "smooth" }); } catch (e) {}
+}
+
+// ===== 错误 =====
+function showError(msg) {
+  var box = document.getElementById("error");
+  box.textContent = "⚠️ " + msg;
+  box.style.display = "block";
+}
+function hideError() {
+  document.getElementById("error").style.display = "none";
+}
+function showNotice(msg) {
+  var box = document.getElementById("error");
+  box.textContent = msg;
+  box.style.display = "block";
+}
+</script>
+</body>
+</html>

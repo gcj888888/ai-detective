@@ -1,0 +1,8 @@
+fastapi>=0.110
+uvicorn>=0.29
+tencentcloud-sdk-python>=3.0.1200
+
+# 截图查证用的本地 OCR（纯 pip 安装，不需要系统级 Tesseract）
+# 体积较大（含 onnxruntime 与中文模型），装不上时截图查证会自动降级提示，
+# 不影响文字查证与深度调查这两条主链路
+rapidocr-onnxruntime>=1.3.24
