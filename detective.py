@@ -11,7 +11,7 @@ import llm_openai
 import prompts
 from wsa_search import WsaSearchError, SearchResult, search as wsa_search
 
-RUNTIME_VERSION = "2026-10-25-evidence-v2.9.4"
+RUNTIME_VERSION = "2026-10-25-evidence-v2.9.5"
 VERDICTS = VERDICT_KEYS = ("对", "错", "不确定")
 _CST = datetime.timezone(datetime.timedelta(hours=8))
 ALIASES = {"真":"对", "假":"错", "说不准":"不确定", "没查到可靠来源":"不确定", **{s:s for s in VERDICTS}}
@@ -224,7 +224,7 @@ def assess(query, results, prompt=None, timeout=35, progress=None):
              _assess_started)
 
     try:
-        raw = llm_openai.chat(prompts.SYSTEM_PROMPT, prompt or prompts.build_user_prompt(query,results), api_key=key, model=model, base_url=base, timeout=max(1,timeout), max_tokens=1100, on_retry=_on_retry, on_fallback=_on_fallback)
+        raw = llm_openai.chat(prompts.SYSTEM_PROMPT, prompt or prompts.build_user_prompt(query,results), api_key=key, model=model, base_url=base, timeout=max(1,timeout), max_tokens=config.LLM_MAX_TOKENS, on_retry=_on_retry, on_fallback=_on_fallback)
     except llm_openai.LLMError as exc:
         guidance = _evidence_guidance(query,"不确定","incomplete",[],["模型调用未完成"],"服务失败或超时")
         return {"verdict":"不确定", "reason":"调查未完成：结论生成超时或服务暂时不可用。", "detail":"已取得资料列在下方，可核对原文；未生成的结论不代表说法错误。", "uncertainty_reason":"服务失败或超时", "status":"incomplete", "llm_error":str(exc), "evidence_audit":{"accepted":False,"issues":["模型调用未完成"],"evidence":[]}, **guidance}

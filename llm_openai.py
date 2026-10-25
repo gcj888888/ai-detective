@@ -128,6 +128,13 @@ def resolve():
             config.DEEPSEEK_MODEL,
             config.DEEPSEEK_BASE_URL,
         )
+    if provider == "openai":
+        return (
+            "openai",
+            config.OPENAI_API_KEY,
+            config.OPENAI_MODEL,
+            config.OPENAI_BASE_URL,
+        )
     return (
         "tokenhub",
         config.TOKENHUB_API_KEY,
@@ -140,6 +147,7 @@ _KEY_HINTS = {
     "toklens": "TOKLENS_API_KEY",
     "tokenhub": "TOKENHUB_API_KEY",
     "deepseek": "DEEPSEEK_API_KEY",
+    "openai": "OPENAI_API_KEY",
 }
 
 
@@ -201,6 +209,14 @@ def chat(system_prompt: str, user_prompt: str,
                 headers={
                     "Content-Type": "application/json",
                     "Authorization": f"Bearer {api_key}",
+                    # 部分网关在 Cloudflare 后面，会按 UA 拦截无头客户端（返回 403 / error code 1010）。
+                    # 带上常见浏览器 UA 避免被误判为爬虫，这在纯服务端调用里是必需的。
+                    "User-Agent": (
+                        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                        "AppleWebKit/537.36 (KHTML, like Gecko) "
+                        "Chrome/141.0.0.0 Safari/537.36"
+                    ),
+                    "Accept": "application/json",
                 },
                 method="POST",
             )
@@ -261,9 +277,28 @@ def chat(system_prompt: str, user_prompt: str,
             raise last_error or LLMError("大模型调用未完成。")
 
         try:
-            content = data["choices"][0]["message"]["content"]
+            message = data["choices"][0]["message"]
+            content = message.get("content")
+            # 有的网关把正文拆成 [{"type":"text","text":...}] 的分片数组。
+            if isinstance(content, list):
+                content = "".join(
+                    part.get("text", "") if isinstance(part, dict) else str(part)
+                    for part in content
+                )
             if not isinstance(content, str) or not content.strip():
-                raise TypeError("message.content 必须为非空字符串")
+                finish = str(data["choices"][0].get("finish_reason") or "")
+                usage = data.get("usage") or {}
+                thinking = (usage.get("completion_tokens_details") or {}).get("reasoning_tokens")
+                if finish == "length":
+                    # 推理型模型会把预算先花在 thinking 上，正文没来得及写。
+                    extra = f"，其中思考用了 {thinking} tokens" if thinking else ""
+                    raise LLMError(
+                        f"大模型输出被截断：{max_tokens} tokens 用完了{extra}，正文为空。"
+                        "这是输出预算不足，不是内容有问题。"
+                    )
+                raise LLMError(
+                    f"大模型返回空正文（finish_reason={finish or '未知'}），没有可核验的内容。"
+                )
             return content
         except (KeyError, IndexError, TypeError) as e:
             raise LLMError("大模型返回格式异常：缺少可用的文本内容。") from e

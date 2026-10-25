@@ -63,6 +63,19 @@ DEEPSEEK_API_KEY = get("DEEPSEEK_API_KEY")
 DEEPSEEK_MODEL = get("DEEPSEEK_MODEL", "deepseek-chat")
 DEEPSEEK_BASE_URL = get("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
 
+# 任意 OpenAI 兼容网关（备选里最通用的一路）
+# 只要对方提供 /chat/completions 就能接：把 base_url 指过去、填 key 和模型名即可。
+OPENAI_API_KEY = get("OPENAI_API_KEY")
+OPENAI_MODEL = get("OPENAI_MODEL", "gpt-4o-mini")
+OPENAI_BASE_URL = get("OPENAI_BASE_URL", "https://api.openai.com/v1")
+
+# 单次判断的输出预算。推理型模型（如 deepseek-v4.1-flash）会先花 token 思考，
+# 预算给小了正文会是空的，所以默认留足。
+try:
+    LLM_MAX_TOKENS = int(get("LLM_MAX_TOKENS", "2600"))
+except ValueError:
+    LLM_MAX_TOKENS = 2600
+
 # —— 演示开关：没有密钥时用假数据跑通全流程 ——
 USE_MOCK = get("USE_MOCK", "0") == "1"
 

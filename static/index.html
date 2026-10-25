@@ -1393,6 +1393,9 @@ function incompleteText(d) {
   if (/API_KEY_DISABLED|401|Unauthorized|密钥|额度|quota|insufficient/i.test(raw)) {
     return "这次没查完：判断服务的密钥或额度不可用，属于配置问题，不是把这句话判成错的。恢复后重新查一次即可。";
   }
+  if (/输出被截断|输出预算|返回空正文|finish_reason/i.test(raw)) {
+    return "这次没查完：模型的输出预算被思考过程占满，正文没有写出来，不能当作结论。稍后再试一次。";
+  }
   if (/格式异常|结构化|非JSON|invalid_evidence_format/i.test(raw)) {
     return "这次没查完：返回内容格式异常，已经丢弃，不能当作结论。稍后再试一次。";
   }
