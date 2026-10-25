@@ -73,10 +73,13 @@ python app.py
 |---|---|
 | `TENCENT_SECRET_ID` / `TENCENT_SECRET_KEY` | 腾讯云密钥，用于元宝搜索 |
 | `WSA_MODE` / `WSA_CNT` | 元宝搜索可选参数，留空用默认 |
-| `LLM_PROVIDER` | `toklens`（默认）/ `tokenhub` / `deepseek` |
+| `LLM_PROVIDER` | `toklens`（默认）/ `tokenhub` / `deepseek` / `openai` |
 | `TOKLENS_API_KEY` / `TOKLENS_MODEL` / `TOKLENS_BASE_URL` | toklens 的 Key、模型名、接口地址 |
 | `TOKENHUB_API_KEY` / `TOKENHUB_MODEL` / `TOKENHUB_BASE_URL` | 腾讯 TokenHub |
 | `DEEPSEEK_API_KEY` / `DEEPSEEK_MODEL` / `DEEPSEEK_BASE_URL` | DeepSeek 备选 |
+| `OPENAI_API_KEY` / `OPENAI_MODEL` / `OPENAI_BASE_URL` | 任意 OpenAI 兼容网关，只需填接口地址与模型名 |
+| `LLM_FALLBACK_MODELS` | 主模型失败后的降级链，逗号分隔；留空不降级 |
+| `LLM_MAX_TOKENS` | 单次判断的输出预算，默认 6000；给推理型模型留够思考空间 |
 | `USE_MOCK` | `1` 时用假数据，不发真实请求 |
 | `PORT` | 本地端口，默认 8000；公网平台会注入 |
 
