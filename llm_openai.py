@@ -164,6 +164,41 @@ def _read_body(error):
             pass
 
 
+def _content_of(data: dict, max_tokens: int) -> str:
+    """从 OpenAI 兼容响应里取正文；取不到时给出能看懂的原因。"""
+    try:
+        choice = data["choices"][0]
+        message = choice.get("message") or {}
+    except (KeyError, IndexError, TypeError) as e:
+        raise LLMError("大模型返回格式异常：响应里没有 choices。", code="bad_format") from e
+
+    content = message.get("content")
+    # 有的网关把正文拆成 [{"type":"text","text":...}] 的分片数组。
+    if isinstance(content, list):
+        content = "".join(
+            part.get("text", "") if isinstance(part, dict) else str(part)
+            for part in content
+        )
+    if isinstance(content, str) and content.strip():
+        return content
+
+    finish = str(choice.get("finish_reason") or "")
+    usage = data.get("usage") or {}
+    thinking = (usage.get("completion_tokens_details") or {}).get("reasoning_tokens")
+    if finish == "length":
+        # 推理型模型会把预算先花在 thinking 上，正文没来得及写。
+        extra = f"，其中思考用了 {thinking} tokens" if thinking else ""
+        raise LLMError(
+            f"大模型输出被截断：{max_tokens} tokens 用完了{extra}，正文为空。"
+            "这是输出预算不足，不是内容有问题。",
+            code="truncated",
+        )
+    raise LLMError(
+        f"大模型返回空正文（finish_reason={finish or '未知'}），没有可核验的内容。",
+        code="empty",
+    )
+
+
 def chat(system_prompt: str, user_prompt: str,
          api_key: str, model: str, base_url: str, timeout: int = 90,
          max_tokens: int = 1600, on_retry=None, on_fallback=None) -> str:
@@ -281,7 +316,13 @@ def chat(system_prompt: str, user_prompt: str,
                         break
                     raise LLMError(f"大模型请求出错：{e}") from e
             if got_response:
-                break
+                try:
+                    return _content_of(data, max_tokens)
+                except LLMError as err:
+                    # 空正文 / 被截断 / 结构异常：都视为"这个模型这次没给出可用答案"。
+                    # 有备用模型就继续降级，避免用户只看到一句莫名其妙的未完成。
+                    last_error = err
+                    got_response = False
             nxt = chain[index + 1] if index + 1 < len(chain) else None
             if nxt and on_fallback is not None:
                 try:
@@ -290,32 +331,5 @@ def chat(system_prompt: str, user_prompt: str,
                     pass
         if not got_response:
             raise last_error or LLMError("大模型调用未完成。")
-
-        try:
-            message = data["choices"][0]["message"]
-            content = message.get("content")
-            # 有的网关把正文拆成 [{"type":"text","text":...}] 的分片数组。
-            if isinstance(content, list):
-                content = "".join(
-                    part.get("text", "") if isinstance(part, dict) else str(part)
-                    for part in content
-                )
-            if not isinstance(content, str) or not content.strip():
-                finish = str(data["choices"][0].get("finish_reason") or "")
-                usage = data.get("usage") or {}
-                thinking = (usage.get("completion_tokens_details") or {}).get("reasoning_tokens")
-                if finish == "length":
-                    # 推理型模型会把预算先花在 thinking 上，正文没来得及写。
-                    extra = f"，其中思考用了 {thinking} tokens" if thinking else ""
-                    raise LLMError(
-                        f"大模型输出被截断：{max_tokens} tokens 用完了{extra}，正文为空。"
-                        "这是输出预算不足，不是内容有问题。"
-                    )
-                raise LLMError(
-                    f"大模型返回空正文（finish_reason={finish or '未知'}），没有可核验的内容。"
-                )
-            return content
-        except (KeyError, IndexError, TypeError) as e:
-            raise LLMError("大模型返回格式异常：缺少可用的文本内容。") from e
     finally:
         _call_lock.release()
