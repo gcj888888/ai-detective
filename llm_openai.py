@@ -65,10 +65,10 @@ def fallback_models(primary: str):
     可用 .env 的 LLM_FALLBACK_MODELS 覆盖（逗号分隔），留空则关闭降级。
     """
     provider = (config.LLM_PROVIDER or "toklens").lower()
-    if provider != "toklens":
-        return []
     getter = getattr(config, "get", None)
-    raw = getter("LLM_FALLBACK_MODELS", _TOKLENS_FALLBACK_DEFAULT) if getter else _TOKLENS_FALLBACK_DEFAULT
+    # 只有 toklens 有实测过的默认备选；其他提供方必须显式配置，避免瞎猜模型名。
+    default = _TOKLENS_FALLBACK_DEFAULT if provider == "toklens" else ""
+    raw = getter("LLM_FALLBACK_MODELS", default) if getter else default
     names = [name.strip() for name in str(raw or "").split(",")]
     return [name for name in names if name and name != primary][:_MAX_FALLBACK_MODELS]
 
@@ -188,6 +188,8 @@ def chat(system_prompt: str, user_prompt: str,
     attempted = 0
     waited = 0.0
     chain = [model] + fallback_models(model)
+    # 总时限：主模型超时后仍有剩余时间才切备用模型，避免"降级把总时间翻倍"。
+    deadline = time.monotonic() + max(1, timeout)
     try:
         data = None
         got_response = False
@@ -221,8 +223,12 @@ def chat(system_prompt: str, user_prompt: str,
                 method="POST",
             )
             while True:
+                remaining = deadline - time.monotonic()
+                if remaining <= 1:
+                    last_error = LLMError("大模型在总时限内没有返回结果，已停止等待。", code="timeout")
+                    break
                 try:
-                    with urllib.request.urlopen(req, timeout=timeout) as resp:
+                    with urllib.request.urlopen(req, timeout=max(5, min(remaining, timeout))) as resp:
                         data = json.loads(resp.read().decode("utf-8"))
                     got_response = True
                     if attempted or index:
@@ -231,10 +237,10 @@ def chat(system_prompt: str, user_prompt: str,
                             _cooldown_until = 0.0
                     break
                 except urllib.error.HTTPError as e:
-                    if e.code == 404:
-                        # 实测该网关在模型不可用时会对同一路径返回 404，换下一个模型。
+                    # 400/404/5xx 多为"这个模型此刻不可用"，换链上的下一个模型比直接失败有用。
+                    if e.code in (400, 404, 500, 502, 503, 504):
                         last_error = LLMError(
-                            f"模型 {current} 当前不可用（HTTP 404）。", code=404)
+                            f"模型 {current} 暂时不可用（HTTP {e.code}）。", code=e.code)
                         break
                     if e.code != 429:
                         raise LLMError(
@@ -264,6 +270,15 @@ def chat(system_prompt: str, user_prompt: str,
                     )
                     break
                 except Exception as e:  # 网络、超时等
+                    left = deadline - time.monotonic()
+                    has_next = index + 1 < len(chain)
+                    if has_next and left > 8:
+                        # 还有备用模型、也还有时间：记下原因，换下一个继续。
+                        last_error = LLMError(
+                            f"模型 {current} 请求超时或网络异常（{e}），已改用备用模型。",
+                            code="timeout",
+                        )
+                        break
                     raise LLMError(f"大模型请求出错：{e}") from e
             if got_response:
                 break
