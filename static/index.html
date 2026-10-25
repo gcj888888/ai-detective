@@ -1390,6 +1390,9 @@ function incompleteText(d) {
   if (/演示模式/.test(raw)) {
     return "当前是演示数据，没有真实证据，不能据此判断对错。配置真实检索后再查一次。";
   }
+  if (/API_KEY_DISABLED|401|Unauthorized|密钥|额度|quota|insufficient/i.test(raw)) {
+    return "这次没查完：判断服务的密钥或额度不可用，属于配置问题，不是把这句话判成错的。恢复后重新查一次即可。";
+  }
   if (/格式异常|结构化|非JSON|invalid_evidence_format/i.test(raw)) {
     return "这次没查完：返回内容格式异常，已经丢弃，不能当作结论。稍后再试一次。";
   }
@@ -1592,6 +1595,8 @@ function esc(s) {
 function renderEvidenceAudit(d, element) {
   // 算术结论由程序精确计算，不需要也不应该用网页引文充当证明；计算说明已在上方 detail。
   if (d.verification_method === "exact_arithmetic") return;
+  // 未完成时没有任何可核验的引文，提示条已说明原因，不再重复一个空的“依据”区。
+  if (d.status === "incomplete") return;
   var panel = document.createElement("section");
   panel.className = "evidence-explanation";
 

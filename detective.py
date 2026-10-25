@@ -11,7 +11,7 @@ import llm_openai
 import prompts
 from wsa_search import WsaSearchError, SearchResult, search as wsa_search
 
-RUNTIME_VERSION = "2026-10-25-evidence-v2.9.3"
+RUNTIME_VERSION = "2026-10-25-evidence-v2.9.4"
 VERDICTS = VERDICT_KEYS = ("对", "错", "不确定")
 _CST = datetime.timezone(datetime.timedelta(hours=8))
 ALIASES = {"真":"对", "假":"错", "说不准":"不确定", "没查到可靠来源":"不确定", **{s:s for s in VERDICTS}}
